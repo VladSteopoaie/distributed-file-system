@@ -94,13 +94,11 @@ std::string CacheInterface::cache_get_object(std::string key)
 //////////////////////////////
 
 int CacheServerL::cache_init() override {
-    CacheInterface::cache_init();
-
     nfds = FD_SETSIZE;
     FD_ZERO(&read_fd_set);
     FD_ZERO(&active_fd_set);
 
-    return 0;
+    return CacheInterface::cache_init();
 }
 
 int CacheServer::cache_set_object(std::string key, std::string value, time_t expiration, uint32_t flags)
