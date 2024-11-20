@@ -1,4 +1,4 @@
-#include "cache_api.h"
+#include "cache_api.hpp"
 // #include <libmemcached/memcached.h>
 // #include <spdlog/spdlog.h>  
 
@@ -6,73 +6,96 @@
 // ----[ ABSTRACT CLASS ]---- //
 ////////////////////////////////
 
+CacheInterface::CacheInterface(asio::io_context& context, std::string address, int port, std::string mem_conf_string) 
+    : context(context)
+    , acceptor(context)
+    , signals(context)
+    , resolver(context)
+    , mem_client(NULL)
+    , mem_conf_string(mem_conf_string)
+{
+    try{
+
+        ////// ASIO INITIALIZATION //////
+        endpoint = *resolver.resolve(address, std::to_string(port)).begin();
+        acceptor.open(endpoint.protocol());
+        acceptor.set_option(tcp::acceptor::reuse_address(true));
+
+        signals.add(SIGINT);
+        signals.add(SIGTERM);
+        signals.async_wait([&](auto, auto){ 
+            SPDLOG_WARN("Intrerupt: Exiting ...");
+            context.stop(); 
+        });
+
+        ////// MEMCACHED CONNECTION //////
+        if (mem_conf_string.length() == 0)
+        {
+            // SPDLOG_ERROR("init: Configuration string is empty!");
+            throw std::runtime_error("init: Configuration string is empty!");
+            // return -1;
+        }
+
+        // check for a configuration file
+        size_t start_pos = mem_conf_string.find("--FILE=");
+        
+        if (start_pos != std::string::npos)
+        {
+            size_t end_pos = start_pos + std::string("--FILE=").length();
+            std::string mem_conf_file = mem_conf_string.substr(end_pos);
+            if (read_conf_file(mem_conf_file, mem_conf_string) != 0)
+                throw std::runtime_error(std::format("read_conf_file: {}", strerror(errno)));
+                // return -1;
+        }
+
+        // check validity of conf_string
+        char conf_error[500];
+
+        if (libmemcached_check_configuration(mem_conf_string.c_str(), mem_conf_string.length(), conf_error, sizeof(conf_error)) != MEMCACHED_SUCCESS)
+        {
+            // std::cerr << conf_error << std::endl;
+            // SPDLOG_ERROR("init: Invalid configuration string! [{}]", conf_error);
+            throw std::runtime_error(std::format("init: Invalid configuration string! [{}]", conf_error));
+            // return -1;
+        }
+
+        // initializing connectivity
+        mem_client = memcached(mem_conf_string.c_str(), mem_conf_string.length());
+
+        if (mem_client == NULL)
+        {
+            // std::cerr << "inti(): Memcached error when initializing connectivity!" << std::endl;
+            // SPDLOG_ERROR("init: Memcached error when initializing connectivity!");
+            throw std::runtime_error("Server constructor: Memcached error when initializing connectivity!");
+            // return -1;
+        }
+    } // try
+    catch (std::exception& e)
+    {
+        throw std::runtime_error(e.what());
+    }
+}
+
+CacheInterface::CacheInterface(asio::io_context& context, std::string address, int port)
+    : CacheInterface(context, address, port, "")
+{}
+
+// {}
+
+
 CacheInterface::~CacheInterface() 
 {
     memcached_free(mem_client);
-    close(master_socket);
 }
 
-int CacheInterface::cache_init() {
+// int CacheInterface::cache_init() 
+// {
+
+
     
-    ////// SOCKETS //////
-    master_socket = socket(AF_INET, SOCK_STREAM, 0);
-    if (master_socket < 0)
-    {
-        // std::cerr << "init: " << strerror(errno) << std::endl;
-        SPDLOG_ERROR("init: {}", strerror(errno));
-        return -1;
-    }
 
-    master_addr.sin_family = AF_INET;
-    master_addr.sin_port = htons(hostname.port);
-    
-    if (inet_pton(AF_INET, hostname.address.c_str(), &master_addr.sin_addr) <= 0)
-    {
-        // std::cerr << "init: " << strerror(errno) << std::endl;
-        SPDLOG_ERROR("init: {}", strerror(errno));
-        return -1;
-    }
-
-    ////// MEMCACHED CONNECTION //////
-    if (mem_conf_string.length() == 0)
-    {
-        SPDLOG_ERROR("init: Configuration string is empty!");
-        return -1;
-    }
-
-    // check for a configuration file
-    size_t start_pos = mem_conf_string.find("--FILE=");
-    
-    if (start_pos != std::string::npos)
-    {
-        size_t end_pos = start_pos + std::string("--FILE=").length();
-        std::string mem_conf_file = mem_conf_string.substr(end_pos);
-        if (read_conf_file(mem_conf_file, mem_conf_string) != 0)
-            return -1;
-    }
-
-    // check validity of conf_string
-    char conf_error[500];
-
-    if (libmemcached_check_configuration(mem_conf_string.c_str(), mem_conf_string.length(), conf_error, sizeof(conf_error)) != MEMCACHED_SUCCESS)
-    {
-        // std::cerr << conf_error << std::endl;
-        SPDLOG_ERROR("init: Invalid configuration string! [{}]", conf_error);
-        return -1;
-    }
-
-    // initializing connectivity
-    mem_client = memcached(mem_conf_string.c_str(), mem_conf_string.length());
-
-    if (mem_client == NULL)
-    {
-        // std::cerr << "inti(): Memcached error when initializing connectivity!" << std::endl;
-        SPDLOG_ERROR("init: Memcached error when initializing connectivity!");
-        return -1;
-    }
-
-    return 0;
-}
+//     return 0;
+// }
 
 std::string CacheInterface::cache_get_object(std::string key)
 {
@@ -93,13 +116,13 @@ std::string CacheInterface::cache_get_object(std::string key)
 // ----[ SERVER CLASS ]---- //
 //////////////////////////////
 
-int CacheServerL::cache_init() override {
-    nfds = FD_SETSIZE;
-    FD_ZERO(&read_fd_set);
-    FD_ZERO(&active_fd_set);
+// int CacheServerL::cache_init() override {
+//     nfds = FD_SETSIZE;
+//     FD_ZERO(&read_fd_set);
+//     FD_ZERO(&active_fd_set);
 
-    return CacheInterface::cache_init();
-}
+//     return CacheInterface::cache_init();
+// }
 
 int CacheServer::cache_set_object(std::string key, std::string value, time_t expiration, uint32_t flags)
 {
@@ -111,8 +134,9 @@ int CacheServer::cache_set_object(std::string key, std::string value, time_t exp
     if (result != MEMCACHED_SUCCESS)
     {
         // std::cerr << "cache_set_object: " << memcached_strerror(mem_client, result) << std::endl;
-        SPDLOG_ERROR("cache_set_object: {}", memcached_strerror(mem_client, result));
-        return -1;
+        // SPDLOG_ERROR("cache_set_object: {}", memcached_strerror(mem_client, result));
+        throw std::runtime_error(std::format("cache_set_object: {}", memcached_strerror(mem_client, result)));
+        // return -1;
     }
 
     return 0;
@@ -123,42 +147,43 @@ int CacheServer::cache_set_object(std::string key, std::string value)
     return cache_set_object(key, value, 0, 0);
 }
 
-int CacheServer::cache_listen()
-{
-    // LISTENING PROCESS
-    if (bind(master_socket, (struct sockaddr*) &master_addr, sizeof(master_addr)) == -1)
-    {
-        // std::cerr << "listen: " << strerror(errno) << std::endl;
-        SPDLOG_ERROR("listen: {}", strerror(errno));
-        return -1;
-    }
+// int CacheServer::cache_listen()
+// {
+//     // LISTENING PROCESS
+//     if (bind(master_socket, (struct sockaddr*) &master_addr, sizeof(master_addr)) == -1)
+//     {
+//         // std::cerr << "listen: " << strerror(errno) << std::endl;
+//         // SPDLOG_ERROR("listen: {}", strerror(errno));
+//         throw std::runtime_error(std::format("listen: {}", strerror(errno)));
+//         // return -1;
+//     }
 
-    if (listen(master_socket, BACKLOG) == -1) // 128 is backlog value (the maximum number of pending connections)
-    {
-        // std::cerr << "listen: " << strerror(errno) << std::endl;
-        SPDLOG_ERROR("listen: {}", strerror(errno));
-        return -1;
-    }
+//     if (listen(master_socket, BACKLOG) == -1) // 128 is backlog value (the maximum number of pending connections)
+//     {
+//         // std::cerr << "listen: " << strerror(errno) << std::endl;
+//         // SPDLOG_ERROR("listen: {}", strerror(errno));
+//         // return -1;
+//         throw std::runtime_error(std::format("listen: {}", strerror(errno)));
+//     }
 
-    SPDLOG_INFO("Server listening on {}:{}...", hostname.address, hostname.port);
+//     SPDLOG_INFO("Server listening on {}:{}...", endpoint.address().to_string(), endpoint.port().to_string());
 
-    // ACCEPTING CONNECTIONS
+//     // ACCEPTING CONNECTIONS
 
-    while (true)
-    {
+//     // while (true)
+//     // {
+//     //     ;
+//     // }
 
-    }
+//     return 0;
+// }
 
-    return 0;
-}
-
-// TODO: implement concurrency
-int CacheServer::cache_accept()
-{
+// int CacheServer::cache_accept()
+// {
     
 
-    return 0;
-}
+//     return 0;
+// }
 
 //////////////////////////////
 // ----[ CLIENT CLASS ]---- //
@@ -175,7 +200,7 @@ int read_conf_file(std::string conf_file, std::string& conf_string)
     if (!file)
     {
         // std::cerr << "read_conf_file: " << strerror(errno) << std::endl;
-        SPDLOG_ERROR("read_conf_file: {}", strerror(errno));
+        // SPDLOG_ERROR("read_conf_file: {}", strerror(errno));
         return -1;
     }
 
