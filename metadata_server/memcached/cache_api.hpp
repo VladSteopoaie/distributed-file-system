@@ -5,13 +5,13 @@
 // g++ --std=c++20 server_api.cpp cache_api.cpp app.cpp -o app -I/usr/include/spdlog -lfmt -lmemcached
 
 // external libraries
-#define ASIO_STANALONE // non-boost version
-#define ASIO_NO_DEPRECATED // no need for deprecated stuff
-#define ASIO_HAS_STD_COROUTINE // c++20 coroutines needed
-#include <asio.hpp>
+// #define ASIO_STANALONE // non-boost version
+// #define ASIO_NO_DEPRECATED // no need for deprecated stuff
+// #define ASIO_HAS_STD_COROUTINE // c++20 coroutines needed
+// #include <asio.hpp>
+// #include <spdlog/spdlog.h>
 
 #include <libmemcached/memcached.h>
-#include <spdlog/spdlog.h>
 #include "server_api.hpp"
 
 // standard libraries

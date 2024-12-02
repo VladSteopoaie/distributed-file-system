@@ -1,9 +1,11 @@
 #ifndef SERVER_API_HPP
 #define SERVER_API_HPP
 
+#define ASIO_STANALONE // non-boost version
+#define ASIO_NO_DEPRECATED // no need for deprecated stuff
+#define ASIO_HAS_STD_COROUTINE // c++20 coroutines needed
 #include <asio.hpp>
 #include <spdlog/spdlog.h>
-#include <iostream>
 
 using asio::ip::tcp;
 

@@ -129,7 +129,7 @@ void CacheConnectionHandler::start()
 
 //         if (mem_client == NULL)
 //         {
-//             throw std::runtime_error("Server constructor: Memcached error when initializing connectivity!");
+//             throw std::runtime_error("CacheServer: Memcached error when initializing connectivity!");
 //         }
 //     } // try
 //     catch (std::exception& e)
@@ -175,7 +175,7 @@ CacheServer::CacheServer(int thread_count, std::string mem_conf_string)
         ////// MEMCACHED CONNECTION //////
         if (mem_conf_string.length() == 0)
         {
-            throw std::runtime_error("Server constructor: Configuration string is empty!");
+            throw std::runtime_error("CacheServer: Configuration string is empty!");
         }
 
         // check for a configuration file
@@ -193,7 +193,7 @@ CacheServer::CacheServer(int thread_count, std::string mem_conf_string)
 
         if (libmemcached_check_configuration(mem_conf_string.c_str(), mem_conf_string.length(), conf_error, sizeof(conf_error)) != MEMCACHED_SUCCESS)
         {
-            throw std::runtime_error(std::format("Server constructor: Invalid configuration string! [{}]", conf_error));
+            throw std::runtime_error(std::format("CacheServer: Invalid configuration string! [{}]", conf_error));
         }
 
         // initializing connectivity
@@ -201,7 +201,7 @@ CacheServer::CacheServer(int thread_count, std::string mem_conf_string)
 
         if (mem_client == NULL)
         {
-            throw std::runtime_error("Server constructor: Memcached error when initializing connectivity!");
+            throw std::runtime_error("CacheServer: Memcached error when initializing connectivity!");
         }
     } // try
     catch (std::exception& e) {
@@ -209,12 +209,53 @@ CacheServer::CacheServer(int thread_count, std::string mem_conf_string)
     }
 }
 
-CacheServer::CacheServer(int thread_count) 
-    : CacheServer(thread_count, "")
-{}
+CacheServer::CacheServer(int thread_count, uint16_t memcached_port) 
+    : GenericServer<CacheConnectionHandler>::GenericServer(thread_count)
+    , memcached_port(memcached_port)
+    , mem_conf_string(std::format("--SERVER=127.0.0.1:{}", memcached_port))
+{
+    // starting a memcached server
+    SPDLOG_INFO("CacheServer: Starting memcached server on 0.0.0.0:{}.", memcached_port);
+    pid_t pid = fork();
+
+    if (pid == 0)
+    {
+        char* const args[] = {(char*)"memcached", (char*)"-p", (char*)std::to_string(memcached_port).c_str(), nullptr};
+        int result = execvp("memcachd", args);
+
+        if (result != 0)
+        {
+            SPDLOG_ERROR("execvp: {}", strerror(errno));
+        }
+
+        exit(0);
+    }
+    else if (pid > 0)
+    {
+        // check validity of conf_string
+        char conf_error[500];
+
+        if (libmemcached_check_configuration(mem_conf_string.c_str(), mem_conf_string.length(), conf_error, sizeof(conf_error)) != MEMCACHED_SUCCESS)
+        {
+            throw std::runtime_error(std::format("CacheServer: Invalid configuration string! [{}]", conf_error));
+        }
+
+        // initializing connectivity
+        mem_client = memcached(mem_conf_string.c_str(), mem_conf_string.length());
+
+        if (mem_client == NULL)
+        {
+            throw std::runtime_error("CacheServer: Memcached error when initializing connectivity!");
+        }
+    }
+    else 
+    {
+        throw std::runtime_error(std::format("fork: {}", strerror(errno)));
+    }
+}
 
 CacheServer::CacheServer()
-    : CacheServer(1)
+    : CacheServer(1, 11211)
 {}
 
 void CacheServer::run(uint16_t port) {
