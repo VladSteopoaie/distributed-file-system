@@ -30,11 +30,11 @@ $(TARGET): $(OBJS) $(TEST_SRC:%.cpp=$(OBJDIR)/%.o) | $(BINDIR)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
 # Compile source files into object files
-%.o: %.cpp | $(OBJDIR)
-	$(CXX) $(CXXFLAGS) -c $< -o $(OBJDIR)/$@
+$(OBJDIR)/%.o: %.cpp | $(OBJDIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 # Allow test file to be provided as an argument
-$(OBJDIR)/$(TEST_SRC:.cpp=.o): $(TEST_SRC)
+$(TEST_SRC:%.cpp=$(OBJDIR)/%.o): $(TEST_SRC)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 # Clean up build artifacts
