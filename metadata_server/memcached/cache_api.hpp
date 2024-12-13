@@ -7,6 +7,7 @@
 // external libraries
 #include <libmemcached/memcached.h>
 #include "server_api.hpp"
+#include "cache_protocol.hpp"
 
 // standard libraries
 #include <iostream>

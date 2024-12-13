@@ -3,29 +3,34 @@
 
 #include <cstdint>
 #include <vector>
+#include <string>
+#include <ctime>
+#include <stdexcept>
+#include <format>
 
-enum ResultCode {
-    UNKNOWN,
-    SUCCESS = 0
+
+namespace ResultCode {
+    enum Type {
+        UNKNOWN,
+        SUCCESS = 0
+    };
+
+    uint8_t to_byte(Type rescode);
+    Type from_byte(uint8_t byte);
+    std::string to_string(Type rescode);
 }
 
-namespace ResultCodeFunc {
-    uint8_t to_byte(ResultCode rescode);
-    ResultCode from_byte(uint8_t byte);
-    std::string to_string(ResultCode rescode);
-}
+namespace OperationCode {
+    enum Type {
+        UNKNOWN,
+        NOP = 0,
+        GET = 1,
+        SET = 2
+    };
 
-enum OperationCode {
-    UNKNOWN,
-    NOP = 0,
-    GET = 1,
-    SET = 2
-}
-
-namespace OperationCodeFunc {
-    uint8_t to_byte(OperationCode rescode);
-    OperationCode from_byte(uint8_t byte);
-    std::string to_string(OperationCode rescode);
+    uint8_t to_byte(Type rescode);
+    Type from_byte(uint8_t byte);
+    std::string to_string(Type rescode);
 }
 
 
@@ -39,21 +44,26 @@ private:
 
 public:
     BytePacketBuffer();
-    BytePacketBuffer(uint8_t* new_buf, size_t len);
+    BytePacketBuffer(const uint8_t* new_buf, size_t len);
 
-    size_t get_possition();
+    // resizes the buffer and moves c_pos at the beggining  
+    void resize(size_t len);
+    size_t get_size() const;
+    const uint8_t* get_buffer() const;
+
+    size_t get_possition() const;
 
     // move the position over a specific number of bytes
-    // void step(size_t steps);
+    void step(size_t steps);
 
     // change current position
-    // void seek(size_t pos);
+    void seek(size_t pos);
 
     // get the current byte from buffer's position without changing the position
-    uint8_t get_byte(size_t pos);
+    uint8_t get_byte(size_t pos) const;
 
     // get a range of bytes from buf without changing the position
-    uint8_t* get_range(size_t start, size_t len);
+    // uint8_t* get_range(size_t start, size_t len);
 
     // read one byte from the buffer's position and change the position
     uint8_t read_u8();
@@ -72,10 +82,14 @@ public:
 class CachePacket {
 private:
     // header
-    OperationCode opcode;
-    ResultCode rescode;
+    uint16_t id;
+    OperationCode::Type opcode; // 1 byte
+    ResultCode::Type rescode; // 1 byte
+
     uint8_t flags;
-    uint8_t pad; // padding (some space for future add-ons)
+    uint8_t pad8; // padding (some space for future add-ons)
+    uint16_t pad16;
+    
     uint32_t time;
     uint32_t key_len;
     uint32_t value_len;
@@ -88,9 +102,9 @@ public:
     CachePacket();
 
     // static CachePacket read(BytePacketBuffer &buffer);
-    static CachePacket from_buffer(uint8_t* buffer, size_t length);
-    void write(BytePacketBuffer buffer);
-    std::string to_stirng() const;
+    void from_buffer(const uint8_t* buffer, size_t len);
+    size_t to_buffer(BytePacketBuffer& packetBuffer);
+    std::string to_string() const;
 };
 
 
@@ -112,4 +126,13 @@ public:
 //     void write(BytePacketBuffer buffer);
 //     std::string to_stirng() const;
 // }
+
+
+// Some additional helper functions
+
+// From: https://github.com/VladSteopoaie/DNS-tunneling/blob/main/dns_server/modules/dns_module.h
+
+std::vector<uint8_t> get_byte_array_from_string(std::string string); 
+std::string get_string_from_byte_array(std::vector<uint8_t> byte_array);
+
 #endif

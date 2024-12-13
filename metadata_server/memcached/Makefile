@@ -1,0 +1,44 @@
+# Compiler and flags
+CXX = g++
+CXXFLAGS = --std=c++20 -I/usr/include/spdlog
+LDFLAGS = -lfmt -lmemcached
+
+TEST_SRC = test2.cpp
+
+# Directories for objects and binary
+OBJDIR = objects
+BINDIR = bin
+
+# Target executable
+TARGET = $(BINDIR)/test
+
+# Source files
+SRCS = cache_protocol.cpp cache_api.cpp
+
+# Object files
+OBJS = $(SRCS:%.cpp=$(OBJDIR)/%.o)
+
+# Default target
+all: $(TARGET)
+# @$(MAKE) clean
+
+$(OBJDIR) $(BINDIR):
+	mkdir -p $@
+
+# Link the target executable
+$(TARGET): $(OBJS) $(TEST_SRC:%.cpp=$(OBJDIR)/%.o) | $(BINDIR)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+
+# Compile source files into object files
+%.o: %.cpp | $(OBJDIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $(OBJDIR)/$@
+
+# Allow test file to be provided as an argument
+$(OBJDIR)/$(TEST_SRC:.cpp=.o): $(TEST_SRC)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+# Clean up build artifacts
+clean:
+	rm -rf $(OBJDIR)
+
+.PHONY: all clean
