@@ -5,12 +5,6 @@
 // g++ --std=c++20 server_api.cpp cache_api.cpp app.cpp -o app -I/usr/include/spdlog -lfmt -lmemcached
 
 // external libraries
-// #define ASIO_STANALONE // non-boost version
-// #define ASIO_NO_DEPRECATED // no need for deprecated stuff
-// #define ASIO_HAS_STD_COROUTINE // c++20 coroutines needed
-// #include <asio.hpp>
-// #include <spdlog/spdlog.h>
-
 #include <libmemcached/memcached.h>
 #include "server_api.hpp"
 
@@ -25,11 +19,9 @@
 
 using asio::ip::tcp;
 
-
 ////////////////////////////////////
 // ----[ CONNECTION HANDLER ]---- //
 ////////////////////////////////////
-
 class CacheConnectionHandler : public std::enable_shared_from_this<CacheConnectionHandler>
 {
 private:
@@ -39,15 +31,58 @@ private:
 
     int cache_set_object(std::string key, std::string value, time_t expiration, uint32_t flags);
     int cache_set_object(std::string key, std::string value);
+    std::string cache_get_object(std::string key);
 
 public:
     CacheConnectionHandler(asio::io_context& context, memcached_st* mem_client);
     ~CacheConnectionHandler();
 
-    std::string cache_get_object(std::string key);
     tcp::socket& get_socket();
     void start();
 };
+
+//////////////////////////////
+// ----[ SERVER CLASS ]---- //
+//////////////////////////////
+class CacheServer : public GenericServer<CacheConnectionHandler> {
+private:
+    // memcached stuff
+    memcached_st* mem_client;
+    std::string mem_conf_string;
+    uint16_t memcached_port;
+    pid_t memcached_pid;
+
+
+public:
+    CacheServer(const CacheServer&) = delete;
+    CacheServer& operator= (const CacheServer&) = delete;
+    
+    CacheServer(int thread_count, std::string mem_conf_string);
+    CacheServer(int thread_count, uint16_t memcached_port);
+    CacheServer(int thread_count);
+    CacheServer();
+    ~CacheServer();
+
+    void run(uint16_t port);
+};
+
+//////////////////////////////
+// ----[ CLIENT CLASS ]---- //
+//////////////////////////////
+// class CacheClient : public CacheInterface {
+// private:
+
+// public:
+//     CacheClient(hostname_st server_name) : CacheInterface(server_name) {};
+//     CacheClient(hostname_st server_name, std::string mem_conf_string) : CacheInterface(server_name, mem_conf_string) {};
+//     ~CacheClient() {};
+//     int connect_to_server();
+
+// };
+
+void read_conf_file(std::string conf_file, std::string& conf_string);
+
+#endif
 
 ////////////////////////////////
 // ----[ ABSTRACT CLASS ]---- //
@@ -74,9 +109,6 @@ public:
 //     std::string cache_get_object(std::string key);
 // };
 
-//////////////////////////////
-// ----[ SERVER CLASS ]---- //
-//////////////////////////////
 
 // class CacheServer : public CacheInterface {
 // private:
@@ -94,40 +126,3 @@ public:
 
 //     void run();
 // };
-
-class CacheServer : public GenericServer<CacheConnectionHandler> {
-private:
-    // memcached stuff
-    memcached_st* mem_client;
-    std::string mem_conf_string;
-    uint16_t memcached_port;
-
-public:
-    CacheServer(const CacheServer&) = delete;
-    CacheServer& operator= (const CacheServer&) = delete;
-    
-    CacheServer(int thread_count, std::string mem_conf_string);
-    CacheServer(int thread_count, uint16_t memcached_port);
-    CacheServer();
-
-    void run(uint16_t port);
-};
-
-//////////////////////////////
-// ----[ CLIENT CLASS ]---- //
-//////////////////////////////
-
-// class CacheClient : public CacheInterface {
-// private:
-
-// public:
-//     CacheClient(hostname_st server_name) : CacheInterface(server_name) {};
-//     CacheClient(hostname_st server_name, std::string mem_conf_string) : CacheInterface(server_name, mem_conf_string) {};
-//     ~CacheClient() {};
-//     int connect_to_server();
-
-// };
-
-void read_conf_file(std::string conf_file, std::string& conf_string);
-
-#endif

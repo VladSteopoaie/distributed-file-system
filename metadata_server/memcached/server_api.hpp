@@ -22,7 +22,10 @@ private:
     template <typename... Args>
     void handle_connection(shared_handler_t handler, std::error_code const& error, Args&& ...args)
     {
-        if (error) { return; }
+        if (error)
+        {
+            throw std::runtime_error(std::format("handle_connection: {}", error.message()));
+        }
 
         handler->start();
 
@@ -74,9 +77,7 @@ public:
                 });
 
             for (int i = 0; i < thread_count; i ++)
-            {
                 thread_pool.emplace_back([&]() { context.run(); });
-            }
         
             context.run();
 
@@ -91,7 +92,6 @@ public:
             throw std::runtime_error(e.what());
         }
     }
-
 };
 
 #endif
