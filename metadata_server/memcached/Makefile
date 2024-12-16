@@ -10,10 +10,10 @@ OBJDIR = objects
 BINDIR = bin
 
 # Target executable
-TARGET = $(BINDIR)/test
+TARGET = $(BINDIR)/$(TEST_SRC:.cpp=)
 
 # Source files
-SRCS = cache_protocol.cpp cache_api.cpp
+SRCS = cache_protocol.cpp cache_api.cpp utils.cpp
 
 # Object files
 OBJS = $(SRCS:%.cpp=$(OBJDIR)/%.o)

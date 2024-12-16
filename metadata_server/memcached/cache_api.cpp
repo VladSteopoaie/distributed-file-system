@@ -7,7 +7,12 @@ template class GenericServer<CacheConnectionHandler>;
 ////////////////////////////////////
 
 // private
-int CacheConnectionHandler::cache_set_object(std::string key, std::string value, time_t expiration, uint32_t flags)
+void CacheConnectionHandler::handle_error(std::string error)
+{
+    SPDLOG_ERROR(error);
+}
+
+int CacheConnectionHandler::set_cache_object(std::string key, std::string value, time_t expiration, uint32_t flags)
 {
     memcached_return_t result = memcached_set(mem_client, 
             key.c_str(), key.size(), 
@@ -16,25 +21,25 @@ int CacheConnectionHandler::cache_set_object(std::string key, std::string value,
 
     if (result != MEMCACHED_SUCCESS)
     {
-        throw std::runtime_error(std::format("cache_set_object: {}", memcached_strerror(mem_client, result)));
+        throw std::runtime_error(std::format("set_cache_object: {}", memcached_strerror(mem_client, result)));
     }
 
     return 0;
 }
 
-int CacheConnectionHandler::cache_set_object(std::string key, std::string value)
+int CacheConnectionHandler::set_cache_object(std::string key, std::string value)
 {
-    return cache_set_object(key, value, 0, 0);
+    return set_cache_object(key, value, 0, 0);
 }
 
-std::string CacheConnectionHandler::cache_get_object(std::string key)
+std::string CacheConnectionHandler::get_cache_object(std::string key)
 {
     memcached_return_t error;
     char* result = memcached_get(mem_client, key.c_str(), key.length(), NULL, NULL, &error);
 
     if (result == NULL)
     {
-        throw std::runtime_error(std::format("cache_get_object: {}", memcached_strerror(mem_client, error)));
+        throw std::runtime_error(std::format("get_cache_object: {}", memcached_strerror(mem_client, error)));
     }
 
     return result;
@@ -45,9 +50,11 @@ CacheConnectionHandler::CacheConnectionHandler(asio::io_context& context, memcac
     : context(context)
     , socket(context)
     , mem_client(mem_client)
+    , max_buf_size(8192)
 {}
 
 CacheConnectionHandler::~CacheConnectionHandler() {
+    socket.close();
     std::cout << "Connection ended!" << std::endl;
 }
 
@@ -56,9 +63,116 @@ tcp::socket& CacheConnectionHandler::get_socket() { return socket; }
 
 void CacheConnectionHandler::start() 
 {
-    std::cout << "Hello" << std::endl;
-    socket.close();
+    tcp::endpoint remote_endpoint =  socket.remote_endpoint();
+    SPDLOG_INFO("New connection from {}:{}.",
+        remote_endpoint.address().to_string(), remote_endpoint.port());
+    read_socket_async();
 }
+
+void CacheConnectionHandler::read_socket_async()
+{
+    auto self(shared_from_this()); // used to keep the connection alive
+
+    // asio::async_read(socket, asio::dynamic_buffer(buffer, max_buf_size),
+    buffer.resize(max_buf_size);
+    socket.async_read_some(asio::buffer(buffer),
+        [this, self] (std::error_code error, size_t bytes_transferred)
+        {
+            try {
+                if (error)
+                {
+                    throw std::runtime_error(error.message());
+                }
+
+                CachePacket request(buffer.data(), bytes_transferred);
+                
+                CachePacket response;
+                handle_request(request, response);
+
+                response.to_buffer(buffer);
+                self->write_socket_async();
+            }
+            catch (std::exception& e)
+            {
+                self->handle_error(std::format("read_socket_async: {}", e.what()));
+            }
+
+        });
+}
+
+void CacheConnectionHandler::write_socket_async()
+{
+    auto self(shared_from_this()); // used to keep the connection alive
+
+    asio::async_write(socket, asio::dynamic_buffer(buffer, max_buf_size),
+        [this, self] (std::error_code error, size_t bytes_transferred)
+        {
+            if (error)
+            {
+                self->handle_error(std::format("write_socket_async: {}", error.message()));
+                return;
+            }
+
+            SPDLOG_INFO("Connection handled successfully!");
+            // try {
+            //     if (error)
+            //     {
+            //         throw std::runtime_error(error.message());
+            //     }
+            // }
+            // catch (std::exception& e)
+            // {
+            //     self->handle_error(std::format("write_socket_async: {}", e.what()));
+            // }
+        });
+}
+
+void CacheConnectionHandler::handle_request(const CachePacket& request, CachePacket& response)
+{
+    if (request.id == 0)
+    {
+        response.rescode = ResultCode::Type::INVPKT;
+        return;
+    }
+
+    response.id = request.id; 
+    response.opcode = request.opcode;
+
+    switch (request.opcode)
+    {
+        case OperationCode::Type::NOP:
+            break;
+        case OperationCode::Type::GET:
+            get_local_object(request, response);
+            break;
+        case OperationCode::Type::SET:
+            set_local_object(request, response);
+            break;
+        default:
+            response.rescode = ResultCode::Type::INVOP;
+            return;
+    }
+    // }
+    // catch (std::exception& e)
+    // {
+    //     throw std::runtime_error(std::fromat("handle_request: {}", e.what()));
+    // }
+
+    response.rescode = ResultCode::Type::SUCCESS;
+}
+
+void CacheConnectionHandler::set_local_object(const CachePacket& request, CachePacket& response)
+{
+    SPDLOG_INFO("In set_local_object!");
+    std::cout << request.to_string() << std::endl;
+}
+
+void CacheConnectionHandler::get_local_object(const CachePacket& request, CachePacket& response)
+{
+    SPDLOG_INFO("In get_local_object!");
+    std::cout << request.to_string() << std::endl;
+}
+
 
 //////////////////////////////
 // ----[ SERVER CLASS ]---- //
@@ -83,7 +197,7 @@ CacheServer::CacheServer(int thread_count, std::string mem_conf_string)
         {
             size_t end_pos = start_pos + std::string("--FILE=").length();
             std::string mem_conf_file = mem_conf_string.substr(end_pos);
-            read_conf_file(mem_conf_file, mem_conf_string);
+            Utils::read_conf_file(mem_conf_file, mem_conf_string);
         }
 
         // check validity of conf_string
@@ -130,11 +244,6 @@ CacheServer::CacheServer(int thread_count, uint16_t memcached_port)
     }
     else if (memcached_pid > 0) // parent process
     {
-        // managing signal behaviour regarding the child process
-        // struct sigaction sa;
-        // sa.sa_handler = [](int) { kill(memcached_pid, SIGKILL); }
-        // sigaction(SIGHUP, &sa, nullptr);
-
         // check validity of conf_string
         char conf_error[500];
 
@@ -189,184 +298,3 @@ void CacheServer::run(uint16_t port) {
 // ----[ UTILS ]---- //
 ///////////////////////
 
-void read_conf_file(std::string conf_file, std::string& conf_string)
-{
-    try {
-        std::ifstream file (conf_file);
-
-        if (!file)
-        {
-            throw std::runtime_error(std::format("read_conf_file: {}", strerror(errno)));
-        }
-
-        std::string content;
-        conf_string.clear();
-        
-        file >> content;
-        conf_string += content;
-
-        while (file >> content)
-            conf_string += " " + content;
-
-        file.close();
-    }
-    catch (std::exception& e)
-    {
-        throw std::runtime_error(e.what());
-    }
-}
-
-
-
-////////////////////////////////
-// ----[ ABSTRACT CLASS ]---- //
-////////////////////////////////
-
-// CacheInterface::CacheInterface(asio::io_context& context, std::string address, int port, std::string mem_conf_string) 
-//     : context(context)
-//     , acceptor(context)
-//     , signals(context)
-//     // , resolver(context)
-//     , mem_client(NULL)
-//     , mem_conf_string(mem_conf_string)
-// {
-//     try{
-
-//         ////// ASIO INITIALIZATION //////
-//         tcp::resolver resolver(context);
-//         endpoint = *resolver.resolve(address, std::to_string(port)).begin();
-//         acceptor.open(endpoint.protocol());
-//         acceptor.set_option(tcp::acceptor::reuse_address(true));
-
-//         signals.add(SIGINT);
-//         signals.add(SIGTERM);
-//         signals.async_wait([&](auto, auto){ 
-//             SPDLOG_WARN("Interrupt: Exiting ...");
-//             context.stop(); 
-//         });
-
-//         ////// MEMCACHED CONNECTION //////
-//         if (mem_conf_string.length() == 0)
-//         {
-//             throw std::runtime_error("init: Configuration string is empty!");
-//         }
-
-//         // check for a configuration file
-//         size_t start_pos = mem_conf_string.find("--FILE=");
-        
-//         if (start_pos != std::string::npos)
-//         {
-//             size_t end_pos = start_pos + std::string("--FILE=").length();
-//             std::string mem_conf_file = mem_conf_string.substr(end_pos);
-//             if (read_conf_file(mem_conf_file, mem_conf_string) != 0)
-//                 throw std::runtime_error(std::format("read_conf_file: {}", strerror(errno)));
-//         }
-
-//         // check validity of conf_string
-//         char conf_error[500];
-
-//         if (libmemcached_check_configuration(mem_conf_string.c_str(), mem_conf_string.length(), conf_error, sizeof(conf_error)) != MEMCACHED_SUCCESS)
-//         {
-//             throw std::runtime_error(std::format("init: Invalid configuration string! [{}]", conf_error));
-//         }
-
-//         // initializing connectivity
-//         mem_client = memcached(mem_conf_string.c_str(), mem_conf_string.length());
-
-//         if (mem_client == NULL)
-//         {
-//             throw std::runtime_error("CacheServer: Memcached error when initializing connectivity!");
-//         }
-//     } // try
-//     catch (std::exception& e)
-//     {
-//         throw std::runtime_error(e.what());
-//     }
-// }
-
-// CacheInterface::CacheInterface(asio::io_context& context, std::string address, int port)
-//     : CacheInterface(context, address, port, "")
-// {}
-
-// CacheInterface::~CacheInterface() 
-// {
-//     memcached_free(mem_client);
-//     context.stop();
-// }
-
-// std::string CacheInterface::cache_get_object(std::string key)
-// {
-//     memcached_return_t error;
-//     char* result = memcached_get(mem_client, key.c_str(), key.length(), NULL, NULL, &error);
-
-//     if (result == NULL)
-//     {
-//         // SPDLOG_ERROR("cache_get_object: {}", memcached_strerror(mem_client, error));
-//         // return std::string();
-//         throw std::runtime_error(std::format("cache_get_object: {}", memcached_strerror(mem_client, error)));
-//     }
-
-//     return result;
-// }
-
-// int CacheServer::cache_set_object(std::string key, std::string value, time_t expiration, uint32_t flags)
-// {
-//     memcached_return_t result = memcached_set(mem_client, 
-//             key.c_str(), key.size(), 
-//             value.c_str(), value.size(),
-//             expiration, flags);
-
-//     if (result != MEMCACHED_SUCCESS)
-//     {
-//         // std::cerr << "cache_set_object: " << memcached_strerror(mem_client, result) << std::endl;
-//         // SPDLOG_ERROR("cache_set_object: {}", memcached_strerror(mem_client, result));
-//         throw std::runtime_error(std::format("cache_set_object: {}", memcached_strerror(mem_client, result)));
-//         // return -1;
-//     }
-
-//     return 0;
-// }
-
-// int CacheServer::cache_set_object(std::string key, std::string value)
-// {
-//     return cache_set_object(key, value, 0, 0);
-// }
-
-// void CacheServer::do_accept()
-// {
-//     acceptor.async_accept([&] (asio::error_code ec, tcp::socket socket) {
-//         if (!acceptor.is_open())
-//             return;
-        
-//         if (ec)
-//         {
-//             throw std::runtime_error(ec.message());
-//         }
-
-//         SPDLOG_INFO("Connection from: {}:{}", socket.remote_endpoint().address().to_string(), socket.remote_endpoint().port());
-        
-        
-
-//         do_accept();
-//     });
-// }
-
-// void CacheServer::run()
-// {
-//     try 
-//     {
-//         acceptor.bind(endpoint);
-//         acceptor.listen();
-
-//         SPDLOG_INFO("Server running on {}:{}", endpoint.address().to_string(), endpoint.port());
-
-//         do_accept();
-
-//         context.run();
-//     }
-//     catch (std::exception& e)
-//     {
-//         context.stop();
-//         throw std::runtime_error(e.what());
-//     }
-// }

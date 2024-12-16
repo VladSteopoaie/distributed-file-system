@@ -1,22 +1,19 @@
 #ifndef CACHE_API_HPP
 #define CACHE_API_HPP
 
-// compilation command
-// g++ --std=c++20 server_api.cpp cache_api.cpp app.cpp -o app -I/usr/include/spdlog -lfmt -lmemcached
-
 // external libraries
 #include <libmemcached/memcached.h>
 #include "server_api.hpp"
 #include "cache_protocol.hpp"
+#include "utils.hpp"
 
 // standard libraries
 #include <iostream>
-#include <fstream>
-#include <vector>
+// #include <fstream>
+// #include <vector>
 #include <fcntl.h>
-#include <string.h>
 #include <unistd.h>
-#include <cstring>
+// #include <cstring>
 
 using asio::ip::tcp;
 
@@ -29,10 +26,21 @@ private:
     asio::io_context& context;
     tcp::socket socket;
     memcached_st* mem_client;
+    const size_t max_buf_size;
+    std::vector<uint8_t> buffer; // buffer to store incoming data
 
-    int cache_set_object(std::string key, std::string value, time_t expiration, uint32_t flags);
-    int cache_set_object(std::string key, std::string value);
-    std::string cache_get_object(std::string key);
+    void handle_error(std::string error);
+    void handle_request(const CachePacket& request, CachePacket& response);
+    
+    int set_cache_object(std::string key, std::string value, time_t expiration, uint32_t flags);
+    int set_cache_object(std::string key, std::string value);
+    std::string get_cache_object(std::string key);
+    
+    void set_local_object(const CachePacket& request, CachePacket& response);
+    void get_local_object(const CachePacket& request, CachePacket& response);
+    
+    void read_socket_async();
+    void write_socket_async();
 
 public:
     CacheConnectionHandler(asio::io_context& context, memcached_st* mem_client);
@@ -52,7 +60,6 @@ private:
     std::string mem_conf_string;
     uint16_t memcached_port;
     pid_t memcached_pid;
-
 
 public:
     CacheServer(const CacheServer&) = delete;
@@ -81,49 +88,5 @@ public:
 
 // };
 
-void read_conf_file(std::string conf_file, std::string& conf_string);
 
 #endif
-
-////////////////////////////////
-// ----[ ABSTRACT CLASS ]---- //
-////////////////////////////////
-// class CacheInterface {
-// protected:    
-//     // memcached stuff
-//     memcached_st* mem_client;
-//     std::string mem_conf_string;
-
-//     // asio stuff
-//     asio::io_context& context;
-//     // tcp::resolver resolver;
-//     tcp::acceptor acceptor;
-//     asio::signal_set signals;
-//     tcp::endpoint endpoint;
-
-// public:
-//     CacheInterface(asio::io_context& context, std::string address, int port);
-//     CacheInterface(asio::io_context& context, std::string address, int port, std::string mem_conf_string);
-//     ~CacheInterface();
-
-//     // virtual int cache_init(); // creates the memcached connection
-//     std::string cache_get_object(std::string key);
-// };
-
-
-// class CacheServer : public CacheInterface {
-// private:
-//     void do_accept();
-// public:
-//     CacheServer(const CacheServer&) = delete;
-//     CacheServer& operator= (const CacheServer&) = delete;
-
-//     CacheServer(asio::io_context& context, std::string address, int port) : CacheInterface(context, address, port) {};
-//     CacheServer(asio::io_context& context, std::string address, int port, std::string mem_conf_string) : CacheInterface(context, address, port, mem_conf_string) {};
-    
-//     ~CacheServer() {};
-//     int cache_set_object(std::string key, std::string value, time_t expiration, uint32_t flags);
-//     int cache_set_object(std::string key, std::string value);
-
-//     void run();
-// };

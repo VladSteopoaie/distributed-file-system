@@ -1,8 +1,8 @@
 #include "cache_protocol.hpp"
 
-/*####################################*/
+/*################################*/
 /*---------[ ResultCode ]---------*/
-/*####################################*/
+/*################################*/
 
 uint8_t ResultCode::to_byte(ResultCode::Type rescode)
 {
@@ -10,6 +10,10 @@ uint8_t ResultCode::to_byte(ResultCode::Type rescode)
     {
         case ResultCode::Type::SUCCESS:
             return 0;
+        case ResultCode::Type::INVPKT:
+            return 1;
+        case ResultCode::Type::INVOP:
+            return 2;
         default:
             return -1;
     }
@@ -21,6 +25,10 @@ ResultCode::Type ResultCode::from_byte(uint8_t byte)
     {
         case 0:
             return ResultCode::Type::SUCCESS;
+        case 1:
+            return ResultCode::Type::INVPKT;
+        case 2:
+            return ResultCode::Type::INVOP;
         default:
             return ResultCode::Type::UNKNOWN;
     }
@@ -32,6 +40,10 @@ std::string ResultCode::to_string(ResultCode::Type rescode)
     {
         case ResultCode::Type::SUCCESS:
             return "SUCCESS";
+        case ResultCode::Type::INVPKT:
+            return "INVPKT";
+        case ResultCode::Type::INVOP:
+            return "INVOP";
         default:
             return "UNKNOWN";
     }
@@ -121,9 +133,9 @@ size_t BytePacketBuffer::get_size() const
     return buffer.size();
 }
 
-const uint8_t* BytePacketBuffer::get_buffer() const
+std::vector<uint8_t> BytePacketBuffer::get_buffer() const
 {
-    return buffer.data();
+    return buffer;
 }
 
 // current position within buffer
@@ -268,40 +280,51 @@ CachePacket::CachePacket()
     rescode = ResultCode::Type::SUCCESS;
 
     flags = 0;
+    message_len = 0;
 
     time = 0;
     key_len = 0;
     value_len = 0;
 
+    message = std::vector<uint8_t>();
     key = std::vector<uint8_t>();
     value = std::vector<uint8_t>();
 }
 
+CachePacket::CachePacket(const uint8_t* buffer, size_t len)
+{
+    from_buffer(buffer, len);
+}
+
 void CachePacket::from_buffer(const uint8_t* buffer, size_t len)
 {
-    BytePacketBuffer packetBuffer = BytePacketBuffer(buffer, len);
+    BytePacketBuffer packet_buffer = BytePacketBuffer(buffer, len);
 
     try {
-        id = packetBuffer.read_u16();
-        opcode = OperationCode::from_byte(packetBuffer.read_u8());
-        rescode = ResultCode::from_byte(packetBuffer.read_u8());
+        id = packet_buffer.read_u16();
+        opcode = OperationCode::from_byte(packet_buffer.read_u8());
+        rescode = ResultCode::from_byte(packet_buffer.read_u8());
 
-        flags = packetBuffer.read_u8();
-        // packetBuffer.read_u8(); // padding 8
-        // packetBuffer.read_u16(); // padding 16
-        packetBuffer.step(3); // stepping 3 bytes (padding)
+        flags = packet_buffer.read_u8();
+        message_len = packet_buffer.read_u16();
+        // packet_buffer.read_u8(); // padding 8
+        packet_buffer.step(1); // stepping 3 bytes (padding)
 
-        time = packetBuffer.read_u32();
-        key_len = packetBuffer.read_u32();
-        value_len = packetBuffer.read_u32();
+        time = packet_buffer.read_u32();
+        key_len = packet_buffer.read_u32();
+        value_len = packet_buffer.read_u32();
+
+        message.resize(message_len);
+        for (int i = 0; i < message_len; i ++)
+            message[i] = packet_buffer.read_u8();
 
         key.resize(key_len);
         for (int i = 0; i < key_len; i ++)
-            key[i] = packetBuffer.read_u8();
+            key[i] = packet_buffer.read_u8();
 
         value.resize(value_len);
         for (int i = 0; i < value_len; i ++)
-            value[i] = packetBuffer.read_u8();
+            value[i] = packet_buffer.read_u8();
     }
     catch (std::exception& e)
     {
@@ -309,31 +332,38 @@ void CachePacket::from_buffer(const uint8_t* buffer, size_t len)
     }
 }
 
-size_t CachePacket::to_buffer(BytePacketBuffer& packetBuffer)
+size_t CachePacket::to_buffer(std::vector<uint8_t>& final_buffer)
 {
-    size_t bytes_returned = 20 + key_len + value_len; // header length + data length 
-    packetBuffer.resize(bytes_returned);
-
-    packetBuffer.write_u16(id);
-    packetBuffer.write_u8(OperationCode::to_byte(opcode));
-    packetBuffer.write_u8(ResultCode::to_byte(rescode));
+    BytePacketBuffer packet_buffer = BytePacketBuffer();
     
-    packetBuffer.write_u8(flags);
-    // packetBuffer.write_u8(0); // padding 8
-    // packetBuffer.write_u16(0); // padding 16
-    packetBuffer.step(3); // skipping 3 bytes (padding) 
+    size_t bytes_returned = 20 + key_len + value_len; // header length + data length 
+    packet_buffer.resize(bytes_returned);
+    final_buffer.resize(bytes_returned);
 
-    packetBuffer.write_u32(time);
-    packetBuffer.write_u32(key_len);
-    packetBuffer.write_u32(value_len);
+    packet_buffer.write_u16(id);
+    packet_buffer.write_u8(OperationCode::to_byte(opcode));
+    packet_buffer.write_u8(ResultCode::to_byte(rescode));
+    
+    packet_buffer.write_u8(flags);
+    packet_buffer.write_u16(message_len);
+    // packet_buffer.write_u8(0); // padding 8
+    packet_buffer.step(1); // skipping 3 bytes (padding) 
 
+    packet_buffer.write_u32(time);
+    packet_buffer.write_u32(key_len);
+    packet_buffer.write_u32(value_len);
+
+    for (int i = 0; i < message_len; i ++)
+        packet_buffer.write_u8(message[i]);
+    
     for (int i = 0; i < key_len; i ++)
-        packetBuffer.write_u8(key[i]);
+        packet_buffer.write_u8(key[i]);
     
     for (int i = 0; i < value_len; i ++)
-        packetBuffer.write_u8(key[i]);
+        packet_buffer.write_u8(key[i]);
 
-    return packetBuffer.get_size();
+    final_buffer = packet_buffer.get_buffer();
+    return packet_buffer.get_size();
 }
 
 std::string CachePacket::to_string() const
@@ -343,41 +373,19 @@ std::string CachePacket::to_string() const
     result += "--\\ opcode: " + OperationCode::to_string(opcode) + "\n";
     result += "--\\ rescode: " + ResultCode::to_string(rescode) + "\n";
     result += "--\\ flags: " + std::to_string(flags) + "\n";
+    result += "--\\ message_len: " + std::to_string(message_len) + "\n";
     result += "--\\ time: " + std::to_string(time) + "\n";
     result += "--\\ key_len: " + std::to_string(key_len) + "\n";
     result += "--\\ value_len: " + std::to_string(value_len) + "\n\n";
+    result += "--\\ Message:\n";
+    result += Utils::get_string_from_byte_array(message);
+    result += "\n\n";
     result += "--\\ Key:\n";
-    result += get_string_from_byte_array(key);
+    result += Utils::get_string_from_byte_array(key);
     result += "\n\n";
     result += "--\\ Value:\n";
-    result += get_string_from_byte_array(value);
+    result += Utils::get_string_from_byte_array(value);
     result += "\n";
 
-    return result;
-}
-
-
-/*######################################*/
-/*---------[ Helper Functions ]---------*/
-/*######################################*/
-
-// From: https://github.com/VladSteopoaie/DNS-tunneling/blob/main/dns_server/modules/dns_module.cpp
-
-// Conversion funtions
-std::vector<uint8_t> get_byte_array_from_string(std::string string)
-{
-    std::vector<uint8_t> byte_array = std::vector<uint8_t>(0);
-    for (int i = 0; i < string.size(); i ++)
-        byte_array.push_back(string[i]);
-    return byte_array;
-}
-
-std::string get_string_from_byte_array(std::vector<uint8_t> byte_array)
-{
-    std::string result(byte_array.size(), '\0');
-
-    for (int i = 0; i < byte_array.size(); i ++){
-        result[i] = byte_array[i];
-    }
     return result;
 }

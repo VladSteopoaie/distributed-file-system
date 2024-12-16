@@ -24,7 +24,8 @@ private:
     {
         if (error)
         {
-            throw std::runtime_error(std::format("handle_connection: {}", error.message()));
+            handle_error(std::format("handle_connection: {}", error.message()));
+            return;
         }
 
         handler->start();
@@ -32,9 +33,16 @@ private:
         auto new_handler = std::make_shared<ConnectionHandler>(context, std::forward<Args>(args)...);
 
         acceptor.async_accept(new_handler->get_socket(), 
-                [new_handler, this, &args...](std::error_code ec) {
-                    handle_connection(new_handler, ec, std::forward<Args>(args)...);
-                });
+            [new_handler, this, &args...](std::error_code ec) {
+                handle_connection(new_handler, ec, std::forward<Args>(args)...);
+            });
+    }
+
+protected:
+    void handle_error(std::string error)
+    {
+        SPDLOG_ERROR(error);
+        context.stop();
     }
 
 public:
@@ -43,18 +51,12 @@ public:
         , acceptor(context)
         , signals(context)
     {
-        try {
-            signals.add(SIGINT);
-            signals.add(SIGTERM);
-            signals.async_wait([&](auto, auto){ 
-                SPDLOG_WARN("Server: Interupt detected. Exiting ...");
-                context.stop(); 
-            });
-        }
-        catch (std::exception& e)
-        {
-            throw std::runtime_error(e.what());
-        }
+        signals.add(SIGINT);
+        signals.add(SIGTERM);
+        signals.async_wait([&](auto, auto){ 
+            SPDLOG_WARN("Server: Interupt detected. Exiting ...");
+            context.stop(); 
+        });
     }
 
     template <typename... Args>

@@ -1,18 +1,22 @@
 #ifndef CACHE_PROTOCOL_HPP
 #define CACHE_PROTOCOL_HPP
 
-#include <cstdint>
-#include <vector>
-#include <string>
+// #include <cstdint>
+// #include <vector>
+// #include <string>
 #include <ctime>
-#include <stdexcept>
-#include <format>
+// #include <stdexcept>
+// #include <format>
+
+#include "utils.hpp"
 
 
 namespace ResultCode {
     enum Type {
-        UNKNOWN,
-        SUCCESS = 0
+        UNKNOWN, // type unkown
+        SUCCESS = 0, // no problems here :)
+        INVPKT = 1, // invalid packet error
+        INVOP = 2, // invalid operation
     };
 
     uint8_t to_byte(Type rescode);
@@ -49,7 +53,7 @@ public:
     // resizes the buffer and moves c_pos at the beggining  
     void resize(size_t len);
     size_t get_size() const;
-    const uint8_t* get_buffer() const;
+    std::vector<uint8_t> get_buffer() const;
 
     size_t get_possition() const;
 
@@ -79,60 +83,31 @@ public:
     void set_u16(size_t pos, uint16_t val);
 };
 
-class CachePacket {
-private:
+struct CachePacket {
     // header
     uint16_t id;
     OperationCode::Type opcode; // 1 byte
     ResultCode::Type rescode; // 1 byte
 
     uint8_t flags;
+    uint16_t message_len; // messages for additional information
     uint8_t pad8; // padding (some space for future add-ons)
-    uint16_t pad16;
     
     uint32_t time;
     uint32_t key_len;
     uint32_t value_len;
-    // CacheHeader header;    
 
     // body
+    std::vector<uint8_t> message;
     std::vector<uint8_t> key;
     std::vector<uint8_t> value;
-public:
-    CachePacket();
 
-    // static CachePacket read(BytePacketBuffer &buffer);
+    CachePacket();
+    CachePacket(const uint8_t* buffer, size_t len);
+
     void from_buffer(const uint8_t* buffer, size_t len);
-    size_t to_buffer(BytePacketBuffer& packetBuffer);
+    size_t to_buffer(std::vector<uint8_t>& buffer);
     std::string to_string() const;
 };
-
-
-
-
-// class CacheHeader {
-// private:
-//     OperationCode opcode;
-//     ResultCode rescode;
-//     uint8_t flags;
-//     uint8_t pad; // padding (some space for future add-ons)
-//     uint32_t time;
-//     uint32_t key_len;
-//     uint32_t value_len;
-// public:
-//     CacheHeader();
-
-//     // CacheHeader read(BytePacketBuffer &buffer);
-//     void write(BytePacketBuffer buffer);
-//     std::string to_stirng() const;
-// }
-
-
-// Some additional helper functions
-
-// From: https://github.com/VladSteopoaie/DNS-tunneling/blob/main/dns_server/modules/dns_module.h
-
-std::vector<uint8_t> get_byte_array_from_string(std::string string); 
-std::string get_string_from_byte_array(std::vector<uint8_t> byte_array);
 
 #endif
