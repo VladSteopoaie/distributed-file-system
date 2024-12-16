@@ -14,6 +14,8 @@ uint8_t ResultCode::to_byte(ResultCode::Type rescode)
             return 1;
         case ResultCode::Type::INVOP:
             return 2;
+        case ResultCode::Type::NOLOCAL:
+            return 3;
         default:
             return -1;
     }
@@ -29,6 +31,8 @@ ResultCode::Type ResultCode::from_byte(uint8_t byte)
             return ResultCode::Type::INVPKT;
         case 2:
             return ResultCode::Type::INVOP;
+        case 3:
+            return ResultCode::Type::NOLOCAL;
         default:
             return ResultCode::Type::UNKNOWN;
     }
@@ -44,6 +48,8 @@ std::string ResultCode::to_string(ResultCode::Type rescode)
             return "INVPKT";
         case ResultCode::Type::INVOP:
             return "INVOP";
+        case ResultCode::Type::NOLOCAL:
+            return "NOLOCAL";
         default:
             return "UNKNOWN";
     }
@@ -54,9 +60,9 @@ std::string ResultCode::to_string(ResultCode::Type rescode)
 /*#######################################*/
 
 
-uint8_t OperationCode::to_byte(OperationCode::Type rescode)
+uint8_t OperationCode::to_byte(OperationCode::Type opcode)
 {
-    switch (rescode)
+    switch (opcode)
     {
         case OperationCode::Type::NOP:
             return 0;
@@ -64,6 +70,8 @@ uint8_t OperationCode::to_byte(OperationCode::Type rescode)
             return 1;
         case OperationCode::Type::SET:
             return 2;
+        case OperationCode::Type::INIT:
+            return 3;
         default:
             return -1;
     }
@@ -79,14 +87,16 @@ OperationCode::Type OperationCode::from_byte(uint8_t byte)
             return OperationCode::Type::GET;
         case 2:
             return OperationCode::Type::SET;
+        case 3:
+            return OperationCode::Type::INIT;
         default:
             return OperationCode::Type::UNKNOWN;
     }
 }
 
-std::string OperationCode::to_string(OperationCode::Type rescode)
+std::string OperationCode::to_string(OperationCode::Type opcode)
 {
-    switch (rescode)
+    switch (opcode)
     {
         case OperationCode::Type::NOP:
             return "NOP";
@@ -94,6 +104,8 @@ std::string OperationCode::to_string(OperationCode::Type rescode)
             return "GET";
         case OperationCode::Type::SET:
             return "SET";
+        case OperationCode::Type::INIT:
+            return "INIT";
         default:
             return "UNKNOWN";
     }
@@ -276,8 +288,8 @@ void BytePacketBuffer::set_u16(size_t pos, uint16_t val)
 CachePacket::CachePacket()
 {
     id = 0;
-    opcode = OperationCode::Type::NOP;
-    rescode = ResultCode::Type::SUCCESS;
+    opcode = 0; // NOP
+    rescode = 0; // SUCCESS
 
     flags = 0;
     message_len = 0;
@@ -302,8 +314,8 @@ void CachePacket::from_buffer(const uint8_t* buffer, size_t len)
 
     try {
         id = packet_buffer.read_u16();
-        opcode = OperationCode::from_byte(packet_buffer.read_u8());
-        rescode = ResultCode::from_byte(packet_buffer.read_u8());
+        opcode = packet_buffer.read_u8();
+        rescode = packet_buffer.read_u8();
 
         flags = packet_buffer.read_u8();
         message_len = packet_buffer.read_u16();
@@ -341,8 +353,8 @@ size_t CachePacket::to_buffer(std::vector<uint8_t>& final_buffer)
     final_buffer.resize(bytes_returned);
 
     packet_buffer.write_u16(id);
-    packet_buffer.write_u8(OperationCode::to_byte(opcode));
-    packet_buffer.write_u8(ResultCode::to_byte(rescode));
+    packet_buffer.write_u8(opcode);
+    packet_buffer.write_u8(rescode);
     
     packet_buffer.write_u8(flags);
     packet_buffer.write_u16(message_len);
@@ -370,8 +382,8 @@ std::string CachePacket::to_string() const
 {
     std::string result = "CachePacket:\n";
     result += "--\\ id: " + std::to_string(id) + "\n";
-    result += "--\\ opcode: " + OperationCode::to_string(opcode) + "\n";
-    result += "--\\ rescode: " + ResultCode::to_string(rescode) + "\n";
+    result += "--\\ opcode: " + OperationCode::to_string(OperationCode::from_byte(opcode)) + "\n";
+    result += "--\\ rescode: " + ResultCode::to_string(ResultCode::from_byte(rescode)) + "\n";
     result += "--\\ flags: " + std::to_string(flags) + "\n";
     result += "--\\ message_len: " + std::to_string(message_len) + "\n";
     result += "--\\ time: " + std::to_string(time) + "\n";

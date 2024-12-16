@@ -17,6 +17,7 @@ namespace ResultCode {
         SUCCESS = 0, // no problems here :)
         INVPKT = 1, // invalid packet error
         INVOP = 2, // invalid operation
+        NOLOCAL = 3, // no local memcached servers
     };
 
     uint8_t to_byte(Type rescode);
@@ -29,12 +30,14 @@ namespace OperationCode {
         UNKNOWN,
         NOP = 0,
         GET = 1,
-        SET = 2
+        SET = 2,
+        INIT = 3, // this command shoud be called by a client who wants to initialize a connection with the server
+                  // the server will send back some information
     };
 
-    uint8_t to_byte(Type rescode);
+    uint8_t to_byte(Type opcode);
     Type from_byte(uint8_t byte);
-    std::string to_string(Type rescode);
+    std::string to_string(Type opcode);
 }
 
 
@@ -86,8 +89,8 @@ public:
 struct CachePacket {
     // header
     uint16_t id;
-    OperationCode::Type opcode; // 1 byte
-    ResultCode::Type rescode; // 1 byte
+    uint8_t opcode;
+    uint8_t rescode;
 
     uint8_t flags;
     uint16_t message_len; // messages for additional information

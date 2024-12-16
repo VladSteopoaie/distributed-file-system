@@ -131,16 +131,17 @@ void CacheConnectionHandler::handle_request(const CachePacket& request, CachePac
 {
     if (request.id == 0)
     {
-        response.rescode = ResultCode::Type::INVPKT;
+        response.rescode = ResultCode::to_byte(ResultCode::Type::INVPKT);
         return;
     }
 
     response.id = request.id; 
     response.opcode = request.opcode;
 
-    switch (request.opcode)
+    switch (OperationCode::from_byte(request.opcode))
     {
         case OperationCode::Type::NOP:
+            response.rescode = ResultCode::to_byte(ResultCode::Type::SUCCESS);
             break;
         case OperationCode::Type::GET:
             get_local_object(request, response);
@@ -148,17 +149,14 @@ void CacheConnectionHandler::handle_request(const CachePacket& request, CachePac
         case OperationCode::Type::SET:
             set_local_object(request, response);
             break;
+        case OperationCode::Type::INIT:
+            init_connection(response);
+            break;
         default:
-            response.rescode = ResultCode::Type::INVOP;
-            return;
+            response.rescode = ResultCode::to_byte(ResultCode::Type::INVOP);
+            break;
     }
-    // }
-    // catch (std::exception& e)
-    // {
-    //     throw std::runtime_error(std::fromat("handle_request: {}", e.what()));
-    // }
 
-    response.rescode = ResultCode::Type::SUCCESS;
 }
 
 void CacheConnectionHandler::set_local_object(const CachePacket& request, CachePacket& response)
@@ -173,6 +171,20 @@ void CacheConnectionHandler::get_local_object(const CachePacket& request, CacheP
     std::cout << request.to_string() << std::endl;
 }
 
+void CacheConnectionHandler::init_connection(CachePacket& response)
+{
+    if (memcached_port <= 0)
+    {
+        response.rescode = ResultCode::to_byte(ResultCode::Type::NOLOCAL);
+        return;
+    }
+
+    response.ResultCode::Type::SUCCESS;
+    response.message_len = 2; // sending the port which has 2 bytes
+    response.message.clear();
+    response.message.push_back(memcached_port >> 8);
+    response.message.push_back(memcached_port & 0xFF);
+}
 
 //////////////////////////////
 // ----[ SERVER CLASS ]---- //
@@ -293,6 +305,93 @@ void CacheServer::run(uint16_t port) {
 //////////////////////////////
 // ----[ CLIENT CLASS ]---- //
 //////////////////////////////
+
+CacheClient::CacheClient()
+    : CacheClient("")
+{}
+
+CacheClient::CacheClient(std::string mem_conf_string)
+    : socket(context)
+    , resolver(context)
+    , mem_conf_string(mem_conf_string)
+{}
+
+asio::awaitable<void> CacheClient::connect_async(std::string address, std::string port)
+{
+    try {
+        tcp::resolver::results_type endpoints = 
+            co_await resolver.async_resolve(address, port, asio::use_awaitable);
+        
+        co_await asio::async_connect(socket, endpoints, asio::use_awaitable);
+        
+        if (mem_conf_string.length() == 0)
+        {
+            CachePacket request, response;
+            request.id = Utils::generate_id();
+            request.opcode = OperationCode::to_byte(OperationCode::Type::INIT);
+
+            co_await send_request_async(request);
+            co_await receive_response_async(response);
+
+            if (request.id != response.id)
+            {
+                throw std::runtime_error("Invalid packet id.");
+            }
+
+            switch (ResultCode::from_byte(response.rescode))
+            {
+                case ResultCode::Type::SUCCESS:
+                    uint16_t memcached_port;
+                    
+                    // here I should receive the port number of the memcached server
+                    // which is 2 bytes long
+                    if (response.message_len != 2)
+                    {
+                        throw std::runtime_error(std::fromat("Invalid message_len, should be 2, received {}.", response.message_len));
+                    }
+
+                    memcached_port = (response.message[0] << 4) + response.message[1];
+                    mem_conf_string = std::format("--SERVER={}:{}", address, std::to_string(port));
+                    break;
+                
+                case ResultCode::Type::NOLOCAL:
+                    throw std::runtime_error("No local memcached server found, a configuration string is required.");
+            }
+        }
+
+        // check for a configuration file
+        // TODO: create a function for this code, already used twice
+        size_t start_pos = mem_conf_string.find("--FILE=");
+        
+        if (start_pos != std::string::npos)
+        {
+            size_t end_pos = start_pos + std::string("--FILE=").length();
+            std::string mem_conf_file = mem_conf_string.substr(end_pos);
+            Utils::read_conf_file(mem_conf_file, mem_conf_string);
+        }
+
+        // check validity of conf_string
+        char conf_error[500];
+
+        if (libmemcached_check_configuration(mem_conf_string.c_str(), mem_conf_string.length(), conf_error, sizeof(conf_error)) != MEMCACHED_SUCCESS)
+        {   
+            throw std::runtime_error(std::format("CacheServer: Invalid configuration string! [{}]", conf_error));
+        }
+
+        mem_client = memcached(mem_conf_string.c_str(), mem_conf_string.length());
+
+        if (mem_client == NULL)
+        {
+            throw std::runtime_error("Memcached error when initializing connectivity!");
+        }
+    }
+    catch (std::exception& e)
+    {
+        throw std::runtime_error(std::fromat("connect_async: {}", e.what()));
+    }
+
+    co_return;
+}
 
 ///////////////////////
 // ----[ UTILS ]---- //

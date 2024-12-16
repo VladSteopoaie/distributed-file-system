@@ -38,6 +38,7 @@ private:
     
     void set_local_object(const CachePacket& request, CachePacket& response);
     void get_local_object(const CachePacket& request, CachePacket& response);
+    void init_connection(CachePacket& response);
     
     void read_socket_async();
     void write_socket_async();
@@ -77,16 +78,23 @@ public:
 //////////////////////////////
 // ----[ CLIENT CLASS ]---- //
 //////////////////////////////
-// class CacheClient : public CacheInterface {
-// private:
+class CacheClient {
+private:
+    asio::io_context context;
+    tcp::socket socket;
+    memcached_st* mem_client;
+    std::string mem_conf_string;
 
-// public:
-//     CacheClient(hostname_st server_name) : CacheInterface(server_name) {};
-//     CacheClient(hostname_st server_name, std::string mem_conf_string) : CacheInterface(server_name, mem_conf_string) {};
-//     ~CacheClient() {};
-//     int connect_to_server();
+    asio::awaitable<void> send_request_async(const CachePacket& request);
+    asio::awaitable<void> receive_response_async(CachePacket& response);
 
-// };
+public:
+    CacheClient();
+    CacheClient(std::string mem_conf_file);
+    ~CacheClient();
+
+    asio::awaitable<void> connect_async(std::string address, std::string port);
+};
 
 
 #endif
