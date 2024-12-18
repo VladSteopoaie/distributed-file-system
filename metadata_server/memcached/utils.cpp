@@ -7,7 +7,7 @@ void Utils::read_conf_file(std::string conf_file, std::string& conf_string)
 
         if (!file)
         {
-            throw std::runtime_error(std::format("read_conf_file: {}", strerror(errno)));
+            throw std::runtime_error(strerror(errno));
         }
 
         std::string content;
@@ -23,7 +23,34 @@ void Utils::read_conf_file(std::string conf_file, std::string& conf_string)
     }
     catch (std::exception& e)
     {
-        throw std::runtime_error(e.what());
+        throw std::runtime_error(std::format("read_conf_file: {}", e.what()));
+    }
+}
+
+void Utils::prepare_conf_string(std::string& mem_conf_string)
+{
+    try {
+        // search if a file was given
+        size_t start_pos = mem_conf_string.find("--FILE=");
+            
+        if (start_pos != std::string::npos)
+        {
+            size_t end_pos = start_pos + std::string("--FILE=").length();
+            std::string mem_conf_file = mem_conf_string.substr(end_pos);
+            Utils::read_conf_file(mem_conf_file, mem_conf_string);
+        }
+
+        // check validity of conf_string
+        char conf_error[500];
+
+        if (libmemcached_check_configuration(mem_conf_string.c_str(), mem_conf_string.length(), conf_error, sizeof(conf_error)) != MEMCACHED_SUCCESS)
+        {   
+            throw std::runtime_error(std::format("Invalid configuration string! [{}]", conf_error));
+        }
+    }
+    catch (std::exception& e)
+    {
+        throw std::runtime_error(std::format("prepare_conf_string: {}", e.what()));
     }
 }
 
@@ -47,7 +74,7 @@ std::vector<uint8_t> Utils::get_byte_array_from_string(std::string string)
 {
     std::vector<uint8_t> byte_array = std::vector<uint8_t>(string.size());
     for (int i = 0; i < string.size(); i ++)
-        byte_array = string[i];
+        byte_array[i] = string[i];
     return byte_array;
 }
 

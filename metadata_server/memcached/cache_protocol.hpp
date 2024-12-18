@@ -87,6 +87,7 @@ public:
 };
 
 struct CachePacket {
+    static const size_t max_packet_size;
     // header
     uint16_t id;
     uint8_t opcode;
@@ -109,7 +110,7 @@ struct CachePacket {
     CachePacket(const uint8_t* buffer, size_t len);
 
     void from_buffer(const uint8_t* buffer, size_t len);
-    size_t to_buffer(std::vector<uint8_t>& buffer);
+    size_t to_buffer(std::vector<uint8_t>& buffer) const;
     std::string to_string() const;
 };
 

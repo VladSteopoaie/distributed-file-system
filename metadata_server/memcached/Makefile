@@ -13,7 +13,7 @@ BINDIR = bin
 TARGET = $(BINDIR)/$(TEST_SRC:.cpp=)
 
 # Source files
-SRCS = cache_protocol.cpp cache_api.cpp utils.cpp
+SRCS = cache_protocol.cpp cache_server.cpp cache_client.cpp cache_connection_handler.cpp utils.cpp
 
 # Object files
 OBJS = $(SRCS:%.cpp=$(OBJDIR)/%.o)

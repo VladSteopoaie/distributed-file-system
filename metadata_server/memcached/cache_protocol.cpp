@@ -284,6 +284,7 @@ void BytePacketBuffer::set_u16(size_t pos, uint16_t val)
 /*#################################*/
 /*---------[ CachePacket ]---------*/
 /*#################################*/
+const size_t CachePacket::max_packet_size = 8192;
 
 CachePacket::CachePacket()
 {
@@ -344,7 +345,7 @@ void CachePacket::from_buffer(const uint8_t* buffer, size_t len)
     }
 }
 
-size_t CachePacket::to_buffer(std::vector<uint8_t>& final_buffer)
+size_t CachePacket::to_buffer(std::vector<uint8_t>& final_buffer) const
 {
     BytePacketBuffer packet_buffer = BytePacketBuffer();
     

@@ -1,0 +1,100 @@
+#include "cache_server.hpp"
+
+using namespace CacheAPI;
+
+template class GenericServer<CacheConnectionHandler>;
+
+//////////////////////////////
+// ----[ SERVER CLASS ]---- //
+//////////////////////////////
+
+CacheServer::CacheServer(int thread_count, std::string mem_conf_string)
+    : GenericServer<CacheConnectionHandler>::GenericServer(thread_count)
+    , mem_conf_string(mem_conf_string)
+    , memcached_pid(-1)
+    , mem_port(0)
+{
+    try {
+        ////// MEMCACHED CONNECTION //////
+        if (mem_conf_string.length() == 0)
+        {
+            throw std::runtime_error("Configuration string is empty!");
+        }
+
+        Utils::prepare_conf_string(mem_conf_string);
+
+        // initializing connectivity
+        mem_client = memcached(mem_conf_string.c_str(), mem_conf_string.length());
+
+        if (mem_client == NULL)
+        {
+            throw std::runtime_error("Memcached error when initializing connectivity!");
+        }
+    } // try
+    catch (std::exception& e)
+    {
+        throw std::runtime_error(std::format("CacheServer: {}", e.what()));
+    }
+}
+
+CacheServer::CacheServer(int thread_count, uint16_t mem_port) 
+    : GenericServer<CacheConnectionHandler>::GenericServer(thread_count)
+    , mem_port(mem_port)
+    , mem_conf_string(std::format("--SERVER=127.0.0.1:{}", mem_port))
+{
+    // starting a memcached server
+    SPDLOG_INFO("CacheServer: Starting memcached server on 0.0.0.0:{}.", mem_port);
+    memcached_pid = fork();
+
+    if (memcached_pid == 0) // child process
+    {
+        // preparing the command
+        char* const args[] = {(char*)"memcached", (char*)"-p", (char*)std::to_string(mem_port).c_str(), nullptr};
+        int result = execvp("memcached", args);
+
+        if (result != 0)
+            SPDLOG_ERROR("execvp: {}", strerror(errno));
+
+        exit(0);
+    }
+    else if (memcached_pid > 0) // parent process
+    {
+        // check validity of conf_string
+        Utils::prepare_conf_string(mem_conf_string);
+
+        // initializing connectivity
+        mem_client = memcached(mem_conf_string.c_str(), mem_conf_string.length());
+
+        if (mem_client == NULL)
+        {
+            throw std::runtime_error("CacheServer: Memcached error when initializing connectivity!");
+        }
+    }
+    else 
+    {
+        throw std::runtime_error(std::format("fork: {}", strerror(errno)));
+    }
+}
+
+CacheServer::CacheServer(int thread_count)
+    : CacheServer(thread_count, 11211) // default memcached port -> 11211
+{}
+
+CacheServer::CacheServer()
+    : CacheServer(1) // default mode -> 1 thread
+{}
+
+CacheServer::~CacheServer()
+{
+    if (memcached_pid > 0) {
+        SPDLOG_INFO("Terminating memcached server.");
+        kill(memcached_pid, SIGKILL);
+    }
+
+    memcached_free(mem_client);
+    SPDLOG_INFO("Exiting Cache Server.");
+}
+
+void CacheServer::run(uint16_t port) {
+    GenericServer<CacheConnectionHandler>::run(port, mem_client, mem_port);
+}
