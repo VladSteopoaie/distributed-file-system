@@ -1,13 +1,6 @@
 #ifndef CACHE_PROTOCOL_HPP
 #define CACHE_PROTOCOL_HPP
 
-// #include <cstdint>
-// #include <vector>
-// #include <string>
-#include <ctime>
-// #include <stdexcept>
-// #include <format>
-
 #include "utils.hpp"
 
 
@@ -18,6 +11,7 @@ namespace ResultCode {
         INVPKT = 1, // invalid packet error
         INVOP = 2, // invalid operation
         NOLOCAL = 3, // no local memcached servers
+        ERRMSG = 4, // error with a message
     };
 
     uint8_t to_byte(Type rescode);

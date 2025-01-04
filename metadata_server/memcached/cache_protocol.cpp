@@ -16,6 +16,8 @@ uint8_t ResultCode::to_byte(ResultCode::Type rescode)
             return 2;
         case ResultCode::Type::NOLOCAL:
             return 3;
+        case ResultCode::Type::ERRMSG:
+            return 4;
         default:
             return -1;
     }
@@ -33,6 +35,8 @@ ResultCode::Type ResultCode::from_byte(uint8_t byte)
             return ResultCode::Type::INVOP;
         case 3:
             return ResultCode::Type::NOLOCAL;
+        case 4:
+            return ResultCode::Type::ERRMSG;
         default:
             return ResultCode::Type::UNKNOWN;
     }
@@ -50,6 +54,8 @@ std::string ResultCode::to_string(ResultCode::Type rescode)
             return "INVOP";
         case ResultCode::Type::NOLOCAL:
             return "NOLOCAL";
+        case ResultCode::Type::ERRMSG:
+            return "ERRMSG";
         default:
             return "UNKNOWN";
     }
@@ -373,7 +379,7 @@ size_t CachePacket::to_buffer(std::vector<uint8_t>& final_buffer) const
         packet_buffer.write_u8(key[i]);
     
     for (int i = 0; i < value_len; i ++)
-        packet_buffer.write_u8(key[i]);
+        packet_buffer.write_u8(value[i]);
 
     final_buffer = packet_buffer.get_buffer();
     return packet_buffer.get_size();
@@ -392,10 +398,10 @@ std::string CachePacket::to_string() const
     result += "--\\ value_len: " + std::to_string(value_len) + "\n\n";
     result += "--\\ Message:\n";
     result += Utils::get_string_from_byte_array(message);
-    result += "\n\n";
+    result += "\n";
     result += "--\\ Key:\n";
     result += Utils::get_string_from_byte_array(key);
-    result += "\n\n";
+    result += "\n";
     result += "--\\ Value:\n";
     result += Utils::get_string_from_byte_array(value);
     result += "\n";

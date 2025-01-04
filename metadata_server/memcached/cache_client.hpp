@@ -6,11 +6,9 @@
 #define ASIO_HAS_STD_COROUTINE // c++20 coroutines needed
 #include <asio.hpp>
 #include <spdlog/spdlog.h>
+#include "cache_protocol.hpp"
 
 using asio::ip::tcp;
-// #include "utils.hpp"
-#include "cache_protocol.hpp"
-#include <iostream> //temp
 
 namespace CacheAPI {
     class CacheClient {
@@ -18,7 +16,9 @@ namespace CacheAPI {
         asio::io_context context;
         tcp::socket socket;
         tcp::resolver resolver;
-
+        std::string address;
+        std::string port;
+        
         memcached_st* mem_client;
         uint16_t mem_port;
         std::string mem_conf_string;
@@ -35,7 +35,14 @@ namespace CacheAPI {
         ~CacheClient();
 
         asio::awaitable<void> connect_async(std::string address, std::string port);
+        asio::awaitable<void> set_async(std::string key, std::string value, uint32_t time, uint8_t flags);
+        asio::awaitable<void> set_async(std::string key, std::string value);
+        asio::awaitable<std::string> get_async(std::string key);
+
         void connect(std::string address, std::string port);
+        void set(std::string key, std::string value, uint32_t time, uint8_t flags);
+        void set(std::string key, std::string value);
+        std::string get(std::string key);
     };
 }
 

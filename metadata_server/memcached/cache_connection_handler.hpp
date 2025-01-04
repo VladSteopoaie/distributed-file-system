@@ -5,10 +5,7 @@
 #define ASIO_NO_DEPRECATED // no need for deprecated stuff
 #define ASIO_HAS_STD_COROUTINE // c++20 coroutines needed
 #include <asio.hpp>
-#include <spdlog/spdlog.h>
-#include <iostream> //temp
 
-#include "utils.hpp"
 #include "cache_protocol.hpp"
 
 using asio::ip::tcp;
@@ -23,23 +20,27 @@ namespace CacheAPI {
         uint16_t mem_port;
         // const size_t max_buf_size;
         std::vector<uint8_t> buffer; // buffer to store incoming data
+        std::string storage_dir;
 
         void handle_error(std::string error);
         void handle_request(const CachePacket& request, CachePacket& response);
         
-        int set_cache_object(std::string key, std::string value, time_t expiration, uint32_t flags);
-        int set_cache_object(std::string key, std::string value);
+        void set_cache_object(std::string key, std::string value, time_t expiration, uint32_t flags);
+        void set_cache_object(std::string key, std::string value);
         std::string get_cache_object(std::string key);
         
-        void set_local_object(const CachePacket& request, CachePacket& response);
-        void get_local_object(const CachePacket& request, CachePacket& response);
+        void set_local_object(std::string key, std::string value);
+        std::string get_local_object(std::string key);
+
+        void get_object(const CachePacket& request, CachePacket& response);
+        void set_object(const CachePacket& request, CachePacket& response);
         void init_connection(CachePacket& response);
         
         void read_socket_async();
         void write_socket_async();
 
     public:
-        CacheConnectionHandler(asio::io_context& context, memcached_st* mem_client, uint16_t mem_port);
+        CacheConnectionHandler(asio::io_context& context, memcached_st* mem_client, uint16_t mem_port, std::string storage_dir);
         ~CacheConnectionHandler();
 
         tcp::socket& get_socket();

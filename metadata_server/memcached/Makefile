@@ -1,6 +1,6 @@
 # Compiler and flags
 CXX = g++
-CXXFLAGS = --std=c++20 -I/usr/include/spdlog
+CXXFLAGS = --std=c++20 -I/usr/include/spdlog -DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE
 LDFLAGS = -lfmt -lmemcached
 
 TEST_SRC = test2.cpp

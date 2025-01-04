@@ -5,6 +5,10 @@
 #define ASIO_NO_DEPRECATED // no need for deprecated stuff
 #define ASIO_HAS_STD_COROUTINE // c++20 coroutines needed
 #include <asio.hpp>
+
+#ifndef SPDLOG_ACTIVE_LEVEL
+#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
+#endif
 #include <spdlog/spdlog.h>
 
 using asio::ip::tcp;

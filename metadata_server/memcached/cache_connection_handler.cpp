@@ -2,17 +2,13 @@
 
 using namespace CacheAPI;
 
-////////////////////////////////////
-// ----[ CONNECTION HANDLER ]---- //
-////////////////////////////////////
-
 // private
 void CacheConnectionHandler::handle_error(std::string error)
 {
     SPDLOG_ERROR(error);
 }
 
-int CacheConnectionHandler::set_cache_object(std::string key, std::string value, time_t expiration, uint32_t flags)
+void CacheConnectionHandler::set_cache_object(std::string key, std::string value, time_t expiration, uint32_t flags)
 {
     memcached_return_t result = memcached_set(mem_client, 
             key.c_str(), key.size(), 
@@ -23,13 +19,17 @@ int CacheConnectionHandler::set_cache_object(std::string key, std::string value,
     {
         throw std::runtime_error(std::format("set_cache_object: {}", memcached_strerror(mem_client, result)));
     }
-
-    return 0;
 }
 
-int CacheConnectionHandler::set_cache_object(std::string key, std::string value)
+void CacheConnectionHandler::set_cache_object(std::string key, std::string value)
 {
-    return set_cache_object(key, value, 0, 0);
+    try {
+        set_cache_object(key, value, 0, 0);
+    }
+    catch (std::exception& e)
+    {
+        throw std::runtime_error(e.what());
+    }
 }
 
 std::string CacheConnectionHandler::get_cache_object(std::string key)
@@ -46,16 +46,16 @@ std::string CacheConnectionHandler::get_cache_object(std::string key)
 }
 
 // public
-CacheConnectionHandler::CacheConnectionHandler(asio::io_context& context, memcached_st* mem_client, uint16_t mem_port)
+CacheConnectionHandler::CacheConnectionHandler(asio::io_context& context, memcached_st* mem_client, uint16_t mem_port, std::string storage_dir)
     : context(context)
     , socket(context)
     , mem_client(mem_client)
     , mem_port(mem_port)
+    , storage_dir(storage_dir)
 {}
 
 CacheConnectionHandler::~CacheConnectionHandler() {
     socket.close();
-    std::cout << "Connection ended!" << std::endl;
 }
 
 tcp::socket& CacheConnectionHandler::get_socket() { return socket; }
@@ -127,16 +127,17 @@ void CacheConnectionHandler::handle_request(const CachePacket& request, CachePac
     response.id = request.id; 
     response.opcode = request.opcode;
 
+    SPDLOG_DEBUG(std::format("Processing: {}", OperationCode::to_string(OperationCode::from_byte(request.opcode))));
     switch (OperationCode::from_byte(request.opcode))
     {
         case OperationCode::Type::NOP:
             response.rescode = ResultCode::to_byte(ResultCode::Type::SUCCESS);
             break;
         case OperationCode::Type::GET:
-            get_local_object(request, response);
+            get_object(request, response);
             break;
         case OperationCode::Type::SET:
-            set_local_object(request, response);
+            set_object(request, response);
             break;
         case OperationCode::Type::INIT:
             init_connection(response);
@@ -148,21 +149,83 @@ void CacheConnectionHandler::handle_request(const CachePacket& request, CachePac
 
 }
 
-void CacheConnectionHandler::set_local_object(const CachePacket& request, CachePacket& response)
+void CacheConnectionHandler::set_object(const CachePacket& request, CachePacket& response)
 {
-    SPDLOG_INFO("In set_local_object!");
-    std::cout << request.to_string() << std::endl;
+    try {
+        uint32_t flags = request.flags;
+        time_t time = static_cast<time_t>(request.time);
+        std::string key = Utils::get_string_from_byte_array(request.key);
+        std::string value = Utils::get_string_from_byte_array(request.value);
+
+        set_cache_object(key, value, time, flags);
+        set_local_object(key, value);
+
+        response.rescode = ResultCode::to_byte(ResultCode::Type::SUCCESS);
+    }
+    catch (std::exception& e)
+    {
+        std::string message = std::format("set_object: {}", e.what());
+        SPDLOG_ERROR(message);
+        response.rescode = ResultCode::to_byte(ResultCode::Type::ERRMSG);
+        response.message_len = static_cast<uint16_t>(message.length());
+        response.message = Utils::get_byte_array_from_string(message);
+    }
 }
 
-void CacheConnectionHandler::get_local_object(const CachePacket& request, CachePacket& response)
+void CacheConnectionHandler::set_local_object(std::string key, std::string value)
 {
-    SPDLOG_INFO("In get_local_object!");
-    std::cout << request.to_string() << std::endl;
+    std::string file_path = storage_dir + key;
+
+    std::ofstream file(file_path);
+
+    if (!file)
+    {
+        throw std::runtime_error(std::format("set_local_object: {}", std::strerror(errno)));
+    }
+
+    file << value;
+}
+
+void CacheConnectionHandler::get_object(const CachePacket& request, CachePacket& response)
+{
+    try {
+        std::string key = Utils::get_string_from_byte_array(request.key);
+        std::string value = get_local_object(key);
+        set_cache_object(key, value);
+
+        response.rescode = ResultCode::to_byte(ResultCode::Type::SUCCESS);
+        response.value_len = value.length();
+        response.value = Utils::get_byte_array_from_string(value);
+    }
+    catch (std::exception& e)
+    {
+        std::string message = std::format("get_object: {}", e.what());
+        SPDLOG_ERROR(message);
+        response.rescode = ResultCode::to_byte(ResultCode::Type::ERRMSG);
+        response.message_len = static_cast<uint16_t>(message.length());
+        response.message = Utils::get_byte_array_from_string(message);
+    }
+
+}
+
+std::string CacheConnectionHandler::get_local_object(std::string key)
+{
+    std::string file_path = storage_dir + key;
+    std::ifstream file(file_path);
+
+    if (!file)
+    {
+        throw std::runtime_error(std::format("set_local_object: {}", std::strerror(errno)));
+    }
+
+    std::ostringstream buf;
+    buf << file.rdbuf();
+    return buf.str();
 }
 
 void CacheConnectionHandler::init_connection(CachePacket& response)
 {
-    std::cout << mem_port << std::endl;
+    // sending the memcached port if it's set
     if (mem_port <= 0)
     {
         response.rescode = ResultCode::to_byte(ResultCode::Type::NOLOCAL);

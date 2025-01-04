@@ -4,17 +4,26 @@ using namespace CacheAPI;
 
 template class GenericServer<CacheConnectionHandler>;
 
-//////////////////////////////
-// ----[ SERVER CLASS ]---- //
-//////////////////////////////
-
-CacheServer::CacheServer(int thread_count, std::string mem_conf_string)
+CacheServer::CacheServer(int thread_count, std::string mem_conf_string, std::string storage_dir)
     : GenericServer<CacheConnectionHandler>::GenericServer(thread_count)
     , mem_conf_string(mem_conf_string)
     , memcached_pid(-1)
     , mem_port(0)
+    , storage_dir(storage_dir)
 {
     try {
+        if (!std::filesystem::exists(storage_dir))
+        {
+            throw std::runtime_error(std::format("No directory {} found.", storage_dir));
+        }
+        else if (!std::filesystem::is_directory(storage_dir))
+        {
+            throw std::runtime_error(std::format("{} it's not a directory.", storage_dir));   
+        } 
+
+        if (storage_dir[storage_dir.length() - 1] != '/')
+            this->storage_dir = storage_dir + "/";
+
         ////// MEMCACHED CONNECTION //////
         if (mem_conf_string.length() == 0)
         {
@@ -37,11 +46,24 @@ CacheServer::CacheServer(int thread_count, std::string mem_conf_string)
     }
 }
 
-CacheServer::CacheServer(int thread_count, uint16_t mem_port) 
+CacheServer::CacheServer(int thread_count, uint16_t mem_port, std::string storage_dir) 
     : GenericServer<CacheConnectionHandler>::GenericServer(thread_count)
     , mem_port(mem_port)
     , mem_conf_string(std::format("--SERVER=127.0.0.1:{}", mem_port))
+    , storage_dir(storage_dir)
 {
+    if (!std::filesystem::exists(storage_dir))
+    {
+        throw std::runtime_error(std::format("No directory {} found.", storage_dir));
+    }
+    else if (!std::filesystem::is_directory(storage_dir))
+    {
+        throw std::runtime_error(std::format("{} it's not a directory.", storage_dir));   
+    }
+
+    if (storage_dir[storage_dir.length() - 1] != '/')
+        this->storage_dir += "/";
+
     // starting a memcached server
     SPDLOG_INFO("CacheServer: Starting memcached server on 0.0.0.0:{}.", mem_port);
     memcached_pid = fork();
@@ -76,12 +98,12 @@ CacheServer::CacheServer(int thread_count, uint16_t mem_port)
     }
 }
 
-CacheServer::CacheServer(int thread_count)
-    : CacheServer(thread_count, 11211) // default memcached port -> 11211
+CacheServer::CacheServer(int thread_count, std::string storage_dir)
+    : CacheServer(thread_count, 11211, storage_dir) // default memcached port -> 11211
 {}
 
-CacheServer::CacheServer()
-    : CacheServer(1) // default mode -> 1 thread
+CacheServer::CacheServer(std::string storage_dir)
+    : CacheServer(1, storage_dir) // default mode -> 1 thread
 {}
 
 CacheServer::~CacheServer()
@@ -91,10 +113,11 @@ CacheServer::~CacheServer()
         kill(memcached_pid, SIGKILL);
     }
 
-    memcached_free(mem_client);
+    if (mem_client != NULL)
+        memcached_free(mem_client);
     SPDLOG_INFO("Exiting Cache Server.");
 }
 
 void CacheServer::run(uint16_t port) {
-    GenericServer<CacheConnectionHandler>::run(port, mem_client, mem_port);
+    GenericServer<CacheConnectionHandler>::run(port, mem_client, mem_port, storage_dir);
 }
