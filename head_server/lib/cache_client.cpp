@@ -167,6 +167,10 @@ asio::awaitable<void> CacheClient::set_async(std::string key, std::string value)
 asio::awaitable<std::string> CacheClient::get_async(std::string key)
 {
     try {
+        std::string mem_value = get_memcached_object(key);
+        if (mem_value.length() > 0)
+            co_return mem_value;
+
         CachePacket request, response;
         request.id = Utils::generate_id();
         request.opcode = OperationCode::to_byte(OperationCode::Type::GET);
@@ -194,6 +198,20 @@ asio::awaitable<std::string> CacheClient::get_async(std::string key)
     }
 
     co_return "";
+}
+
+std::string CacheClient::get_memcached_object(std::string key)
+{
+    memcached_return_t error;
+    char* result = memcached_get(mem_client, key.c_str(), key.length(), NULL, NULL, &error);
+
+    if (result == NULL)
+    {
+        SPDLOG_DEBUG(std::format("get_cache_object: {}", memcached_strerror(mem_client, error)));
+        return "";
+    }
+
+    return result;
 }
 
 void CacheClient::set(std::string key, std::string value, uint32_t time, uint8_t flags)

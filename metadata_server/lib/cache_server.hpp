@@ -3,9 +3,6 @@
 
 #include "cache_connection_handler.hpp"
 #include "server_api.hpp"
-#include <fcntl.h>
-#include <unistd.h>
-#include <filesystem>
 
 namespace CacheAPI {
     class CacheServer : public GenericServer<CacheConnectionHandler> {

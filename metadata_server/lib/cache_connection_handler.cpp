@@ -8,7 +8,7 @@ void CacheConnectionHandler::handle_error(std::string error)
     SPDLOG_ERROR(error);
 }
 
-void CacheConnectionHandler::set_cache_object(std::string key, std::string value, time_t expiration, uint32_t flags)
+void CacheConnectionHandler::set_memcached_object(std::string key, std::string value, time_t expiration, uint32_t flags)
 {
     memcached_return_t result = memcached_set(mem_client, 
             key.c_str(), key.size(), 
@@ -17,14 +17,14 @@ void CacheConnectionHandler::set_cache_object(std::string key, std::string value
 
     if (result != MEMCACHED_SUCCESS)
     {
-        throw std::runtime_error(std::format("set_cache_object: {}", memcached_strerror(mem_client, result)));
+        throw std::runtime_error(std::format("set_memcached_object: {}", memcached_strerror(mem_client, result)));
     }
 }
 
-void CacheConnectionHandler::set_cache_object(std::string key, std::string value)
+void CacheConnectionHandler::set_memcached_object(std::string key, std::string value)
 {
     try {
-        set_cache_object(key, value, 0, 0);
+        set_memcached_object(key, value, 0, 0);
     }
     catch (std::exception& e)
     {
@@ -32,14 +32,28 @@ void CacheConnectionHandler::set_cache_object(std::string key, std::string value
     }
 }
 
-std::string CacheConnectionHandler::get_cache_object(std::string key)
+asio::awaitable<void> CacheConnectionHandler::set_memcached_object_async(std::string key, std::string value, time_t expiration, uint32_t flags)
+{
+    SPDLOG_DEBUG("In set_memcached_object_async");
+    try {
+        set_memcached_object(key, value, expiration, flags);
+    }
+    catch (std::exception& e)
+    {
+        SPDLOG_ERROR(std::format("set_memcached_object_async: {}", e.what()));
+    }
+
+    co_return;
+}
+
+std::string CacheConnectionHandler::get_memcached_object(std::string key)
 {
     memcached_return_t error;
     char* result = memcached_get(mem_client, key.c_str(), key.length(), NULL, NULL, &error);
 
     if (result == NULL)
     {
-        throw std::runtime_error(std::format("get_cache_object: {}", memcached_strerror(mem_client, error)));
+        throw std::runtime_error(std::format("get_memcached_object: {}", memcached_strerror(mem_client, error)));
     }
 
     return result;
@@ -157,7 +171,7 @@ void CacheConnectionHandler::set_object(const CachePacket& request, CachePacket&
         std::string key = Utils::get_string_from_byte_array(request.key);
         std::string value = Utils::get_string_from_byte_array(request.value);
 
-        set_cache_object(key, value, time, flags);
+        set_memcached_object(key, value, time, flags);
         set_local_object(key, value);
 
         response.rescode = ResultCode::to_byte(ResultCode::Type::SUCCESS);
@@ -191,7 +205,9 @@ void CacheConnectionHandler::get_object(const CachePacket& request, CachePacket&
     try {
         std::string key = Utils::get_string_from_byte_array(request.key);
         std::string value = get_local_object(key);
-        set_cache_object(key, value);
+        
+        if (value.length() > 0)
+            asio::co_spawn(context, set_memcached_object_async(key, value, 0, 0), asio::detached);
 
         response.rescode = ResultCode::to_byte(ResultCode::Type::SUCCESS);
         response.value_len = value.length();

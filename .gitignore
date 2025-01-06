@@ -1,3 +1,3 @@
-metadata_server/memcached/objects
-metadata_server/memcached/bin
-metadata_server/memcached/storage
+objects
+bin
+storage

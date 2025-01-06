@@ -1,4 +1,4 @@
-#include "cache_server.hpp"
+#include "lib/cache_server.hpp"
 #include <iostream>
 
 using namespace CacheAPI;
@@ -7,7 +7,7 @@ int main()
 {
     try {
         ////// LOGGER //////
-        // spdlog::set_level(spdlog::level::debug); // Set global log level to debug
+        spdlog::set_level(spdlog::level::trace); // Set global log level to debug
         spdlog::set_pattern("(%s:%#) [%^%l%$] %v");
 
         // CacheServer object(8, "--FILE=./memcached.conf", "./storage/");

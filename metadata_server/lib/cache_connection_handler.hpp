@@ -25,9 +25,10 @@ namespace CacheAPI {
         void handle_error(std::string error);
         void handle_request(const CachePacket& request, CachePacket& response);
         
-        void set_cache_object(std::string key, std::string value, time_t expiration, uint32_t flags);
-        void set_cache_object(std::string key, std::string value);
-        std::string get_cache_object(std::string key);
+        void set_memcached_object(std::string key, std::string value, time_t expiration, uint32_t flags);
+        void set_memcached_object(std::string key, std::string value);
+        asio::awaitable<void> set_memcached_object_async(std::string key, std::string value, time_t expiration, uint32_t flags);
+        std::string get_memcached_object(std::string key);
         
         void set_local_object(std::string key, std::string value);
         std::string get_local_object(std::string key);
