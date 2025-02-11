@@ -34,14 +34,14 @@ namespace CacheAPI {
         ~CacheClient();
 
         asio::awaitable<void> connect_async(std::string address, std::string port);
-        asio::awaitable<void> set_async(std::string key, std::string value, uint32_t time, uint8_t flags);
-        asio::awaitable<void> set_async(std::string key, std::string value);
+        asio::awaitable<int> set_async(std::string key, std::string value, uint32_t time, uint8_t flags);
+        // asio::awaitable<void> set_async(std::string key, std::string value);
         asio::awaitable<std::string> get_async(std::string key);
         std::string get_memcached_object(std::string key); 
 
         void connect(std::string address, std::string port);
-        void set(std::string key, std::string value, uint32_t time, uint8_t flags);
-        void set(std::string key, std::string value);
+        int set(std::string key, std::string value, uint32_t time, uint8_t flags);
+        int set(std::string key, std::string value);
         std::string get(std::string key);
     };
 }

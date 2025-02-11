@@ -1,20 +1,20 @@
 # Compiler and flags
 CXX = g++
 CXXFLAGS = --std=c++20 -I/usr/include/spdlog 
-LDFLAGS = -lfmt -lmemcached
+LDFLAGS = -lfmt -lmemcached -lprotobuf
 
-TEST_SRC = test2.cpp
+SRC = test2.cpp
 
 # Directories for objects and binary
-OBJDIR = objects
+OBJDIR = ../objects
 BINDIR = bin
-SRCDIR = lib
+SRCDIR = ../lib
 
 # Target executable
-TARGET = $(BINDIR)/$(TEST_SRC:.cpp=)
+TARGET = $(BINDIR)/$(SRC:.cpp=)
 
 # Source files
-SRCS = cache_protocol.cpp cache_server.cpp cache_client.cpp cache_connection_handler.cpp utils.cpp
+SRCS = metadata.pb.cpp cache_protocol.cpp cache_server.cpp cache_client.cpp cache_connection_handler.cpp utils.cpp
 # SRCS = $(SRCFILES:%.cpp=$(SRCDIR)/%.cpp)
 
 # Object files
@@ -28,7 +28,7 @@ $(OBJDIR) $(BINDIR):
 	mkdir -p $@
 
 # Link the target executable
-$(TARGET): $(OBJS) $(TEST_SRC:%.cpp=$(OBJDIR)/%.o) | $(BINDIR)
+$(TARGET): $(OBJS) $(SRC:%.cpp=$(OBJDIR)/%.o) | $(BINDIR)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
 # Compile source files into object files
@@ -36,7 +36,7 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.cpp | $(OBJDIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 # Allow test file to be provided as an argument
-$(TEST_SRC:%.cpp=$(OBJDIR)/%.o): $(TEST_SRC)
+$(SRC:%.cpp=$(OBJDIR)/%.o): $(SRC)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 # Clean up build artifacts

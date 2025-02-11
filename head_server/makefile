@@ -1,20 +1,20 @@
 # Compiler and flags
 CXX = g++
 CXXFLAGS = --std=c++20 -I/usr/include/fuse3 -I/usr/include/spdlog
-LDFLAGS = -lfmt -lmemcached -lfuse3 -lpthread
+LDFLAGS = -lfmt -lmemcached -lfuse3 -lpthread -lprotobuf
 
 SRC = test2.cpp
 
 # Directories for objects and binary
-OBJDIR = objects
+OBJDIR = ../objects
 BINDIR = bin
-SRCDIR = lib
+SRCDIR = ../lib
 
 # Target executable
 TARGET = $(BINDIR)/$(SRC:.cpp=)
 
 # Source files
-SRCS = cache_protocol.cpp cache_client.cpp utils.cpp
+SRCS = cache_protocol.cpp cache_client.cpp utils.cpp metadata.pb.cpp
 
 # Object files
 OBJS = $(SRCS:%.cpp=$(OBJDIR)/%.o)

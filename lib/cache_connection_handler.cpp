@@ -168,11 +168,12 @@ void CacheConnectionHandler::set_object(const CachePacket& request, CachePacket&
     try {
         uint32_t flags = request.flags;
         time_t time = static_cast<time_t>(request.time);
-        std::string key = Utils::get_string_from_byte_array(request.key);
-        std::string value = Utils::get_string_from_byte_array(request.value);
-
-        set_memcached_object(key, value, time, flags);
-        set_local_object(key, value);
+        std::string path = Utils::get_string_from_byte_array(request.key);
+        mode_t mode = std::stoul(Utils::get_string_from_byte_array(request.value));
+        // std::cout << mode << std::endl;
+        SPDLOG_DEBUG(mode);
+        std::string value = set_local_file(path, mode);
+        set_memcached_object(path, value, time, flags);
 
         response.rescode = ResultCode::to_byte(ResultCode::Type::SUCCESS);
     }
@@ -181,30 +182,42 @@ void CacheConnectionHandler::set_object(const CachePacket& request, CachePacket&
         std::string message = std::format("set_object: {}", e.what());
         SPDLOG_ERROR(message);
         response.rescode = ResultCode::to_byte(ResultCode::Type::ERRMSG);
-        response.message_len = static_cast<uint16_t>(message.length());
-        response.message = Utils::get_byte_array_from_string(message);
+        response.message_len = 4; // static_cast<uint16_t>(message.length());
+        response.message = Utils::get_byte_array_from_int(errno);// Utils::get_byte_array_from_string(message);
     }
 }
 
-void CacheConnectionHandler::set_local_object(std::string key, std::string value)
+std::string CacheConnectionHandler::set_local_file(std::string path, mode_t mode)
 {
-    std::string file_path = storage_dir + key;
+    std::string file_path = storage_dir + path;
+    std::string result;
+    Stat file_proto;
+    struct stat file_stat;
+    int fd;
 
-    std::ofstream file(file_path);
+    fd = open(file_path.c_str(), O_CREAT | O_RDWR, mode);
+    SPDLOG_DEBUG(fd);
+    if (fd < 0)
+        throw std::runtime_error(std::format("set_local_file: {}", std::strerror(errno)));
 
-    if (!file)
-    {
-        throw std::runtime_error(std::format("set_local_object: {}", std::strerror(errno)));
-    }
+    if (fstat(fd, &file_stat) != 0)
+        throw std::runtime_error(std::format("set_local_file: {}", std::strerror(errno)));
+    // std::cout << 1 << std::endl;
+    Utils::struct_stat_to_proto(&file_stat, file_proto);
+    file_proto.SerializeToString(&result);
+    // std::cout << result << std::endl;
+    // std::cout << result.length() << std::endl;
+    if (write(fd, result.c_str(), result.length()) < 0)
+        throw std::runtime_error(std::format("set_local_file: {}", std::strerror(errno)));
 
-    file << value;
+    return result;
 }
 
 void CacheConnectionHandler::get_object(const CachePacket& request, CachePacket& response)
 {
     try {
         std::string key = Utils::get_string_from_byte_array(request.key);
-        std::string value = get_local_object(key);
+        std::string value = get_local_file(key);
         
         if (value.length() > 0)
             asio::co_spawn(context, set_memcached_object_async(key, value, 0, 0), asio::detached);
@@ -224,14 +237,14 @@ void CacheConnectionHandler::get_object(const CachePacket& request, CachePacket&
 
 }
 
-std::string CacheConnectionHandler::get_local_object(std::string key)
+std::string CacheConnectionHandler::get_local_file(std::string key)
 {
     std::string file_path = storage_dir + key;
     std::ifstream file(file_path);
 
     if (!file)
     {
-        throw std::runtime_error(std::format("set_local_object: {}", std::strerror(errno)));
+        throw std::runtime_error(std::format("get_local_file: {}", std::strerror(errno)));
     }
 
     std::ostringstream buf;

@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+message Stat {
+    int64 dev = 1;        // ID of device containing file (represented as int64)
+    int64 ino = 2;        // Inode number (represented as int64)
+    int32 mode = 3;       // File type and permissions (represented as int32)
+    int32 nlink = 4;      // Number of hard links (represented as int32)
+    int32 uid = 5;        // User ID of owner (represented as int32)
+    int32 gid = 6;        // Group ID of owner (represented as int32)
+    int64 rdev = 7;       // Device ID (if file is a special device)
+    int64 size = 8;       // Total size in bytes (represented as int64)
+    int64 blksize = 9;    // Optimal block size for I/O (represented as int64)
+    int64 blocks = 10;    // Number of 512B blocks allocated (represented as int64)
+    int64 atime = 11;     // Time of last access (represented as int64, Unix timestamp)
+    int64 mtime = 12;     // Time of last modification (represented as int64, Unix timestamp)
+    int64 ctime = 13;     // Time of last status change (represented as int64, Unix timestamp)
+}

@@ -67,9 +67,62 @@ uint16_t Utils::generate_id()
     return dist(gen);
 }
 
-// From: https://github.com/VladSteopoaie/DNS-tunneling/blob/main/dns_server/modules/dns_module.cpp
+void Utils::struct_stat_to_proto(const struct stat* file_stat, Stat& proto_stat) {
+    // std::cout << 1 << std::endl;
+    // std::cout << file_stat << std::endl;
+    // std::cout << file_stat->st_dev << std::endl;
+    proto_stat.set_dev(file_stat->st_dev);
+    // std::cout << proto_stat.dev() << std::endl;
+    proto_stat.set_ino(file_stat->st_ino);
+    proto_stat.set_mode(file_stat->st_mode);
+    proto_stat.set_nlink(file_stat->st_nlink);
+    proto_stat.set_uid(file_stat->st_uid);
+    proto_stat.set_gid(file_stat->st_gid);
+    proto_stat.set_rdev(file_stat->st_rdev);
+    proto_stat.set_size(file_stat->st_size);
+    proto_stat.set_blksize(file_stat->st_blksize);
+    proto_stat.set_blocks(file_stat->st_blocks);
+    proto_stat.set_atime(file_stat->st_atime);
+    proto_stat.set_mtime(file_stat->st_mtime);
+    proto_stat.set_ctime(file_stat->st_ctime);
+}
 
+void Utils::proto_to_struct_stat(const Stat& proto_stat, struct stat* file_stat) {
+    file_stat->st_dev = proto_stat.dev();
+    file_stat->st_ino = proto_stat.ino();
+    file_stat->st_mode = proto_stat.mode();
+    file_stat->st_nlink = proto_stat.nlink();
+    file_stat->st_uid = proto_stat.uid();
+    file_stat->st_gid = proto_stat.gid();
+    file_stat->st_rdev = proto_stat.rdev();
+    file_stat->st_size = proto_stat.size();
+    file_stat->st_blksize = proto_stat.blksize();
+    file_stat->st_blocks = proto_stat.blocks();
+    file_stat->st_atime = proto_stat.atime();
+    file_stat->st_mtime = proto_stat.mtime();
+    file_stat->st_ctime = proto_stat.ctime();
+}
+
+std::vector<uint8_t> Utils::get_byte_array_from_int(uint32_t value)
+{
+    std::vector<uint8_t> byte_array = std::vector<uint8_t>(4);
+    for (int i = 0; i < 4; i ++)
+        byte_array[i] = static_cast<uint8_t>((value >> ((3 - i) * 8))) & 0xFF;
+    return byte_array;
+}
+
+uint32_t Utils::get_int_from_byte_array(std::vector<uint8_t> byte_array)
+{
+    uint32_t value = 0;
+    for (int i = 0; i < 4; i ++)
+        value += static_cast<uint32_t> (byte_array[i] << (3 - i));
+    return value;
+}
+
+
+// From: https://github.com/VladSteopoaie/DNS-tunneling/blob/main/dns_server/modules/dns_module.cpp
 // Conversion funtions
+
 std::vector<uint8_t> Utils::get_byte_array_from_string(std::string string)
 {
     std::vector<uint8_t> byte_array = std::vector<uint8_t>(string.size());
