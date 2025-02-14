@@ -20,10 +20,12 @@ void print_menu()
 {
     std::cout << "(1) Provide a configuration string for the memcached server." << std::endl;
     std::cout << "(2) Connect to a cache server." << std::endl;
-    std::cout << "(3) Set an object." << std::endl;
-    std::cout << "(4) Get an object." << std::endl;
-    std::cout << "(5) Reset connection." << std::endl;
-    std::cout << "(6) End connection." << std::endl;
+    std::cout << "(3) Set a file." << std::endl;
+    std::cout << "(4) Set a dir." << std::endl;
+    std::cout << "(5) Get a file." << std::endl;
+    std::cout << "(6) Get a dir." << std::endl;
+    std::cout << "(7) Reset connection." << std::endl;
+    std::cout << "(8) End connection." << std::endl;
     std::cout << "(m) Print this menu." << std::endl;
     std::cout << "(q) Quit." << std::endl;
 
@@ -61,7 +63,7 @@ int main()
                     {
                         std::cout << "Invalid configuration string!" << std::endl;
                     }
-                } else if (option == "2" || option == "5") {
+                } else if (option == "2" || option == "7") {
                     if (option == "5") {
                         if (!connected)
                         {
@@ -100,8 +102,7 @@ int main()
                     std::string key = read_input("Provide the key");
                     std::string value = read_input("Provide the value");
 
-                    client->set(key, value);
-                    std::cout << "Stored." << std::endl;
+                    client->set_file(key, value);
                 } else if (option == "4") {
                     if (!connected)
                     {
@@ -110,12 +111,36 @@ int main()
                     }
 
                     std::string key = read_input("Provide the key");
-                    std::string value = client->get(key);
+                    std::string value = read_input("Provide the value");
+
+                    client->set_dir(key, value);
+                } else if (option == "5") {
+                    if (!connected)
+                    {
+                        std::cout << "Client not connected." << std::endl;
+                        continue;
+                    }
+
+                    std::string key = read_input("Provide the key");
+                    std::string value = client->get_file(key);
                     if (value.length() <= 0)
                         std::cout << "No value with key " << key << std::endl;
                     else 
                         std::cout << value << std::endl;
                 } else if (option == "6") {
+                    if (!connected)
+                    {
+                        std::cout << "Client not connected." << std::endl;
+                        continue;
+                    }
+
+                    std::string key = read_input("Provide the key");
+                    std::string value = client->get_dir(key);
+                    if (value.length() <= 0)
+                        std::cout << "No value with key " << key << std::endl;
+                    else 
+                        std::cout << value << std::endl;
+                } else if (option == "8") {
                     if (!connected)
                     {
                         std::cout << "No connection to end." << std::endl;

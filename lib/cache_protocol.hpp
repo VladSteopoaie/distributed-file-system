@@ -23,10 +23,12 @@ namespace OperationCode {
     enum Type {
         UNKNOWN,
         NOP = 0,
-        GET = 1,
-        SET = 2,
-        INIT = 3, // this command shoud be called by a client who wants to initialize a connection with the server
+        INIT = 1, // this command shoud be called by a client who wants to initialize a connection with the server
                   // the server will send back some information
+        GET_FILE = 2,
+        GET_DIR = 3,
+        SET_FILE = 4,
+        SET_DIR = 5,
     };
 
     uint8_t to_byte(Type opcode);

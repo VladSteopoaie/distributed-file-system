@@ -72,12 +72,16 @@ uint8_t OperationCode::to_byte(OperationCode::Type opcode)
     {
         case OperationCode::Type::NOP:
             return 0;
-        case OperationCode::Type::GET:
-            return 1;
-        case OperationCode::Type::SET:
-            return 2;
         case OperationCode::Type::INIT:
+            return 1;
+        case OperationCode::Type::GET_FILE:
+            return 2;
+        case OperationCode::Type::GET_DIR:
             return 3;
+        case OperationCode::Type::SET_FILE:
+            return 4;
+        case OperationCode::Type::SET_DIR:
+            return 5;
         default:
             return -1;
     }
@@ -90,11 +94,15 @@ OperationCode::Type OperationCode::from_byte(uint8_t byte)
         case 0:
             return OperationCode::Type::NOP;
         case 1:
-            return OperationCode::Type::GET;
-        case 2:
-            return OperationCode::Type::SET;
-        case 3:
             return OperationCode::Type::INIT;
+        case 2:
+            return OperationCode::Type::GET_FILE;
+        case 3:
+            return OperationCode::Type::GET_DIR;
+        case 4:
+            return OperationCode::Type::SET_FILE;
+        case 5:
+            return OperationCode::Type::SET_DIR;
         default:
             return OperationCode::Type::UNKNOWN;
     }
@@ -106,12 +114,16 @@ std::string OperationCode::to_string(OperationCode::Type opcode)
     {
         case OperationCode::Type::NOP:
             return "NOP";
-        case OperationCode::Type::GET:
-            return "GET";
-        case OperationCode::Type::SET:
-            return "SET";
         case OperationCode::Type::INIT:
             return "INIT";
+        case OperationCode::Type::GET_FILE:
+            return "GET_FILE";
+        case OperationCode::Type::GET_DIR:
+            return "GET_DIR";
+        case OperationCode::Type::SET_FILE:
+            return "SET_FILE";
+        case OperationCode::Type::SET_DIR:
+            return "SET_DIR";
         default:
             return "UNKNOWN";
     }

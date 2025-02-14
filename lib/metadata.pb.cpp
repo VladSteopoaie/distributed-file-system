@@ -18,7 +18,8 @@
 PROTOBUF_PRAGMA_INIT_SEG
 constexpr Stat::Stat(
   ::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized)
-  : dev_(int64_t{0})
+  : dir_list_()
+  , dev_(int64_t{0})
   , ino_(int64_t{0})
   , mode_(0)
   , nlink_(0)
@@ -64,6 +65,7 @@ const uint32_t TableStruct_metadata_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE
   PROTOBUF_FIELD_OFFSET(::Stat, atime_),
   PROTOBUF_FIELD_OFFSET(::Stat, mtime_),
   PROTOBUF_FIELD_OFFSET(::Stat, ctime_),
+  PROTOBUF_FIELD_OFFSET(::Stat, dir_list_),
 };
 static const ::PROTOBUF_NAMESPACE_ID::internal::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) = {
   { 0, -1, -1, sizeof(::Stat)},
@@ -74,16 +76,16 @@ static ::PROTOBUF_NAMESPACE_ID::Message const * const file_default_instances[] =
 };
 
 const char descriptor_table_protodef_metadata_2eproto[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) =
-  "\n\016metadata.proto\"\301\001\n\004Stat\022\013\n\003dev\030\001 \001(\003\022\013"
+  "\n\016metadata.proto\"\323\001\n\004Stat\022\013\n\003dev\030\001 \001(\003\022\013"
   "\n\003ino\030\002 \001(\003\022\014\n\004mode\030\003 \001(\005\022\r\n\005nlink\030\004 \001(\005"
   "\022\013\n\003uid\030\005 \001(\005\022\013\n\003gid\030\006 \001(\005\022\014\n\004rdev\030\007 \001(\003"
   "\022\014\n\004size\030\010 \001(\003\022\017\n\007blksize\030\t \001(\003\022\016\n\006block"
   "s\030\n \001(\003\022\r\n\005atime\030\013 \001(\003\022\r\n\005mtime\030\014 \001(\003\022\r\n"
-  "\005ctime\030\r \001(\003b\006proto3"
+  "\005ctime\030\r \001(\003\022\020\n\010dir_list\030\016 \003(\tb\006proto3"
   ;
 static ::PROTOBUF_NAMESPACE_ID::internal::once_flag descriptor_table_metadata_2eproto_once;
 const ::PROTOBUF_NAMESPACE_ID::internal::DescriptorTable descriptor_table_metadata_2eproto = {
-  false, false, 220, descriptor_table_protodef_metadata_2eproto, "metadata.proto", 
+  false, false, 238, descriptor_table_protodef_metadata_2eproto, "metadata.proto", 
   &descriptor_table_metadata_2eproto_once, nullptr, 0, 1,
   schemas, file_default_instances, TableStruct_metadata_2eproto::offsets,
   file_level_metadata_metadata_2eproto, file_level_enum_descriptors_metadata_2eproto, file_level_service_descriptors_metadata_2eproto,
@@ -103,7 +105,8 @@ class Stat::_Internal {
 
 Stat::Stat(::PROTOBUF_NAMESPACE_ID::Arena* arena,
                          bool is_message_owned)
-  : ::PROTOBUF_NAMESPACE_ID::Message(arena, is_message_owned) {
+  : ::PROTOBUF_NAMESPACE_ID::Message(arena, is_message_owned),
+  dir_list_(arena) {
   SharedCtor();
   if (!is_message_owned) {
     RegisterArenaDtor(arena);
@@ -111,7 +114,8 @@ Stat::Stat(::PROTOBUF_NAMESPACE_ID::Arena* arena,
   // @@protoc_insertion_point(arena_constructor:Stat)
 }
 Stat::Stat(const Stat& from)
-  : ::PROTOBUF_NAMESPACE_ID::Message() {
+  : ::PROTOBUF_NAMESPACE_ID::Message(),
+      dir_list_(from.dir_list_) {
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
   ::memcpy(&dev_, &from.dev_,
     static_cast<size_t>(reinterpret_cast<char*>(&ctime_) -
@@ -153,6 +157,7 @@ void Stat::Clear() {
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
+  dir_list_.Clear();
   ::memset(&dev_, 0, static_cast<size_t>(
       reinterpret_cast<char*>(&ctime_) -
       reinterpret_cast<char*>(&dev_)) + sizeof(ctime_));
@@ -269,6 +274,21 @@ const char* Stat::_InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::inter
         } else
           goto handle_unusual;
         continue;
+      // repeated string dir_list = 14;
+      case 14:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 114)) {
+          ptr -= 1;
+          do {
+            ptr += 1;
+            auto str = _internal_add_dir_list();
+            ptr = ::PROTOBUF_NAMESPACE_ID::internal::InlineGreedyStringParser(str, ptr, ctx);
+            CHK_(::PROTOBUF_NAMESPACE_ID::internal::VerifyUTF8(str, "Stat.dir_list"));
+            CHK_(ptr);
+            if (!ctx->DataAvailable(ptr)) break;
+          } while (::PROTOBUF_NAMESPACE_ID::internal::ExpectTag<114>(ptr));
+        } else
+          goto handle_unusual;
+        continue;
       default:
         goto handle_unusual;
     }  // switch
@@ -376,6 +396,16 @@ uint8_t* Stat::_InternalSerialize(
     target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::WriteInt64ToArray(13, this->_internal_ctime(), target);
   }
 
+  // repeated string dir_list = 14;
+  for (int i = 0, n = this->_internal_dir_list_size(); i < n; i++) {
+    const auto& s = this->_internal_dir_list(i);
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      s.data(), static_cast<int>(s.length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "Stat.dir_list");
+    target = stream->WriteString(14, s, target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -391,6 +421,14 @@ size_t Stat::ByteSizeLong() const {
   uint32_t cached_has_bits = 0;
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
+
+  // repeated string dir_list = 14;
+  total_size += 1 *
+      ::PROTOBUF_NAMESPACE_ID::internal::FromIntSize(dir_list_.size());
+  for (int i = 0, n = dir_list_.size(); i < n; i++) {
+    total_size += ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+      dir_list_.Get(i));
+  }
 
   // int64 dev = 1;
   if (this->_internal_dev() != 0) {
@@ -479,6 +517,7 @@ void Stat::MergeFrom(const Stat& from) {
   uint32_t cached_has_bits = 0;
   (void) cached_has_bits;
 
+  dir_list_.MergeFrom(from.dir_list_);
   if (from._internal_dev() != 0) {
     _internal_set_dev(from._internal_dev());
   }
@@ -535,6 +574,7 @@ bool Stat::IsInitialized() const {
 void Stat::InternalSwap(Stat* other) {
   using std::swap;
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  dir_list_.InternalSwap(&other->dir_list_);
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
       PROTOBUF_FIELD_OFFSET(Stat, ctime_)
       + sizeof(Stat::ctime_)

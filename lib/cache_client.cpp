@@ -2,23 +2,7 @@
 
 using namespace CacheAPI;
 
-CacheClient::CacheClient()
-    : CacheClient("")
-{}
-
-CacheClient::CacheClient(std::string mem_conf_string)
-    : socket(context)
-    , resolver(context)
-    , mem_conf_string(mem_conf_string)
-    , mem_client(NULL)
-{}
-
-CacheClient::~CacheClient()
-{
-    if (mem_client != NULL)
-        memcached_free(mem_client);
-    socket.close();
-}
+// private
 
 asio::awaitable<void> CacheClient::send_request_async(const CachePacket& request)
 {
@@ -58,13 +42,29 @@ asio::awaitable<void> CacheClient::receive_response_async(CachePacket& response)
     co_return;
 }
 
+std::string CacheClient::get_memcached_object(std::string key)
+{
+    memcached_return_t error;
+    char* result = memcached_get(mem_client, key.c_str(), key.length(), NULL, NULL, &error);
 
-asio::awaitable<int> CacheClient::set_async(std::string key, std::string value, uint32_t time, uint8_t flags)
+    if (result == NULL)
+    {
+        SPDLOG_DEBUG(std::format("get_cache_object: {}", memcached_strerror(mem_client, error)));
+        return "";
+    }
+
+    return result;
+}
+
+asio::awaitable<int> CacheClient::set_async(std::string key, std::string value, uint32_t time, uint8_t flags, bool is_file)
 {
     try {
         CachePacket request, response;
         request.id = Utils::generate_id();
-        request.opcode = OperationCode::to_byte(OperationCode::Type::SET);
+        if (is_file)
+            request.opcode = OperationCode::to_byte(OperationCode::Type::SET_FILE);
+        else 
+            request.opcode = OperationCode::to_byte(OperationCode::Type::SET_DIR);
         request.time = time;
         request.flags = flags;
         request.key_len = key.length();
@@ -109,7 +109,39 @@ asio::awaitable<int> CacheClient::set_async(std::string key, std::string value, 
 
 }
 
-asio::awaitable<std::string> CacheClient::get_async(std::string key)
+int CacheClient::set(std::string key, std::string value, uint32_t time, uint8_t flags, bool is_file)
+{
+    std::promise<int> result_promise;
+    std::future<int> result_future = result_promise.get_future();
+
+    asio::co_spawn(
+        context,
+        [&]() -> asio::awaitable<void> {
+            int result = co_await set_async(key, value, time, flags, is_file);
+            result_promise.set_value(result);
+            co_return;
+        },
+        asio::detached
+    );
+
+    context.run();
+    context.restart();
+
+    try {
+        return result_future.get();
+    }
+    catch (...)
+    {
+        return -1;
+    }
+}
+
+int CacheClient::set(std::string key, std::string value, bool is_file)
+{
+    return set(key, value, 0, 0, is_file);
+}
+
+asio::awaitable<std::string> CacheClient::get_async(std::string key, bool is_file)
 {
     try {
         std::string mem_value = get_memcached_object(key);
@@ -118,7 +150,11 @@ asio::awaitable<std::string> CacheClient::get_async(std::string key)
 
         CachePacket request, response;
         request.id = Utils::generate_id();
-        request.opcode = OperationCode::to_byte(OperationCode::Type::GET);
+
+        if (is_file)
+            request.opcode = OperationCode::to_byte(OperationCode::Type::GET_FILE);
+        else
+            request.opcode = OperationCode::to_byte(OperationCode::Type::GET_DIR);
 
         request.key_len = key.length();
         request.key = Utils::get_byte_array_from_string(key);
@@ -145,54 +181,7 @@ asio::awaitable<std::string> CacheClient::get_async(std::string key)
     co_return "";
 }
 
-std::string CacheClient::get_memcached_object(std::string key)
-{
-    memcached_return_t error;
-    char* result = memcached_get(mem_client, key.c_str(), key.length(), NULL, NULL, &error);
-
-    if (result == NULL)
-    {
-        SPDLOG_DEBUG(std::format("get_cache_object: {}", memcached_strerror(mem_client, error)));
-        return "";
-    }
-
-    return result;
-}
-
-int CacheClient::set(std::string key, std::string value, uint32_t time, uint8_t flags)
-{
-    std::promise<int> result_promise;
-    std::future<int> result_future = result_promise.get_future();
-
-    asio::co_spawn(
-        context,
-        [&]() -> asio::awaitable<void> {
-            int result = co_await set_async(key, value, time, flags);
-            result_promise.set_value(result);
-            co_return;
-        },
-        asio::detached
-    );
-
-    context.run();
-    context.restart();
-
-    try {
-        return result_future.get();
-    }
-    catch (...)
-    {
-        return -1;
-    }
-
-}
-
-int CacheClient::set(std::string key, std::string value)
-{
-    return set(key, value, 0, 0);
-}
-
-std::string CacheClient::get(std::string key)
+std::string CacheClient::get(std::string key, bool is_file)
 {
     std::promise<std::string> result_promise;
     std::future<std::string> result_future = result_promise.get_future();
@@ -200,7 +189,7 @@ std::string CacheClient::get(std::string key)
     asio::co_spawn(
         context,
         [&]() -> asio::awaitable<void> {
-            std::string result = co_await get_async(key);
+            std::string result = co_await get_async(key, is_file);
             result_promise.set_value(result);
             co_return;
         },
@@ -217,6 +206,25 @@ std::string CacheClient::get(std::string key)
     {
         return "";
     }
+}
+
+// public
+CacheClient::CacheClient()
+    : CacheClient("")
+{}
+
+CacheClient::CacheClient(std::string mem_conf_string)
+    : socket(context)
+    , resolver(context)
+    , mem_conf_string(mem_conf_string)
+    , mem_client(NULL)
+{}
+
+CacheClient::~CacheClient()
+{
+    if (mem_client != NULL)
+        memcached_free(mem_client);
+    socket.close();
 }
 
 asio::awaitable<void> CacheClient::connect_async(std::string address, std::string port)
@@ -313,4 +321,25 @@ void CacheClient::connect(std::string address, std::string port)
     {
         throw std::runtime_error(e.what());
     }
+}
+
+ 
+int CacheClient::set_file(std::string key, std::string value)
+{
+    return set(key, value, true);
+}
+
+int CacheClient::set_dir(std::string key, std::string value)
+{
+    return set(key, value, false);
+}
+
+std::string CacheClient::get_file(std::string key)
+{
+    return get(key, true);
+}
+
+std::string CacheClient::get_dir(std::string key)
+{
+    return get(key, false);
 }

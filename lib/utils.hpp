@@ -26,9 +26,12 @@ namespace Utils {
     void read_conf_file(std::string conf_file, std::string& conf_string);
     void prepare_conf_string(std::string& conf_string);
     uint16_t generate_id();
-    void struct_stat_to_proto(const struct stat* file_stat, Stat& proto_stat);
-    void proto_to_struct_stat(const Stat& proto_stat, struct stat* file_stat); 
-
+    void struct_stat_to_proto(const struct stat* object_stat, Stat& proto_stat);
+    void proto_to_struct_stat(const Stat& proto_stat, struct stat* object_stat); 
+    std::vector<std::string> get_dir_list(const Stat& proto_stat);
+    void set_dir_list(Stat& proto_stat, const std::vector<std::string>& dir_list);
+    void process_path(std::string& path);
+    std::string get_parent_dir(std::string path);
 
     std::vector<uint8_t> get_byte_array_from_int(uint32_t value);
     uint32_t get_int_from_byte_array(std::vector<uint8_t> byte_array);

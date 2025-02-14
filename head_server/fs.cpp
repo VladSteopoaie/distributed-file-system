@@ -30,46 +30,34 @@ static void* myfs_init(struct fuse_conn_info *connection_info, struct fuse_confi
 static int myfs_create(const char *path, mode_t mode, struct fuse_file_info *file_info) 
 {
 	(void) file_info;
-	std::string str_mode = std::to_string(mode);
 
-	int error = cache_client.set(path, str_mode);
+	int error = cache_client.set_file(path, std::to_string(mode));
 
-	if (error == 0)
-		return 0;
-	else if (error < 0)
+	if (error < 0)
 	{
-		fprintf(strerr, "Error: failed to create the file, please verify the logs!")
+		fprintf(stderr, "Error: failed to create the file, please verify the logs!");
 		return -EIO;
 	}
-	else 
-		return -error;
+	
+	return -error;
 }
 
 static int myfs_getattr(const char *path, struct stat *stat_buf, struct fuse_file_info *file_info)
 {	
 	(void) file_info;
+	Stat proto;
 	memset(stat_buf, 0, sizeof(struct stat));
 
-	std::string value = cache_client.get(path);
-	if (value == "")
-		return -ENOENT;
+	std::string proto_str = cache_client.get_file(path);
+	if (proto_str.empty())
+		proto_str = cache_client.get_dir(path);
+		if (proto_str.empty())
+			return -ENOENT;		
 
-	
+	proto.ParseFromString(proto_str);	
+	Utils::proto_to_struct_stat(proto, stat_buf);
+
 	return 0;
-	// ask memcached with key == path
-	// receive response
-
-	// if no file 
-		// then:
-			// ask metadata_server for the file
-			// receive response
-			// if no file
-				// then: res = -ENOENT
-				// else: copy stat
-		// else:
-			// copy stat 
-
-	return res;
 }
 
 static int myfs_read(const char *path, char *buffer, size_t size, off_t offset, struct fuse_file_info *file_info)
@@ -80,30 +68,61 @@ static int myfs_read(const char *path, char *buffer, size_t size, off_t offset, 
 static int myfs_open(const char *path, struct fuse_file_info *file_info)
 {
 	return 0;
-
 }
 
 static int myfs_write(const char *path, const char *buffer, size_t size, off_t offset, struct fuse_file_info * file_info)
 {           
-
 	return 0;
 }
 
 static int myfs_mkdir(const char *path, mode_t mode)
 {
+	int error = cache_client.set_dir(path, std::to_string(mode));
 
-	return 0;
+	if (error < 0)
+	{
+		fprintf(stderr, "Error: failed to create the file, please verify the logs!");
+		return -EIO;
+	}
+
+	return -error;
 }
 
-static int myfs_readdir(const char *path, void *, fuse_fill_dir_t, off_t, struct fuse_file_info *, enum fuse_readdir_flags)
+static int myfs_readdir(const char *path, void *buffer, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *file_info, enum fuse_readdir_flags flags)
 {
-	return 0;
+	(void) offset;
+	(void) file_info;
+	(void) flags;
 
+	Stat dir_proto;
+	std::string dir_proto_str = cache_client.get_dir(path);
+	if (dir_proto_str.empty())
+		return -ENOENT;
+
+	dir_proto.ParseFromString(dir_proto_str);
+
+	for (const auto& entry : dir_proto.dir_list())
+		filler(buffer, entry.c_str(), nullptr, 0, FUSE_FILL_DIR_PLUS);
+
+	return 0;
 }
+
+static int myfs_opendir(const char *path, struct fuse_file_info *file_info) 
+{
+	std::string result = cache_client.get_dir(path);
+	if (result.length() <= 0)
+		return -ENOENT;
+	return 0;
+}
+
 
 static const struct fuse_operations myfs_oper = {
+	.getattr	= myfs_getattr,
+	.mkdir 		= myfs_mkdir,
+	.opendir	= myfs_opendir,
+	.readdir	= myfs_readdir,
 	.init       = myfs_init,
-	// .getattr	= myfs_getattr,
+	.create 	= myfs_create,
 	// .rename 	= myfs_rename,
 	// .chmod	= myfs_chmod,
 	// .chown	= myfs_chown,
@@ -113,13 +132,9 @@ static const struct fuse_operations myfs_oper = {
 	// .open		= myfs_open,
 	// .read		= myfs_read,
     // .write 	    = myfs_write,
-	.create 		= myfs_create,
 	// .unlink		= myfs_unlink,
 
 	// // dir specific
-	// .mkdir 		= myfs_mkdir,
-	// .readdir	= myfs_readdir,
-	// .opendir	= myfs_opendir,
 	// .rmdir		= myfs_rmdir,
 	// .releasedir = myfs_releasedir
 };

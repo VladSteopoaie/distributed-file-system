@@ -14,4 +14,5 @@ message Stat {
     int64 atime = 11;     // Time of last access (represented as int64, Unix timestamp)
     int64 mtime = 12;     // Time of last modification (represented as int64, Unix timestamp)
     int64 ctime = 13;     // Time of last status change (represented as int64, Unix timestamp)
+    repeated string dir_list = 14; // List of subdirectories and file paths
 }

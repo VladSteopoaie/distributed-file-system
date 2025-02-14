@@ -184,6 +184,7 @@ class Stat final :
   // accessors -------------------------------------------------------
 
   enum : int {
+    kDirListFieldNumber = 14,
     kDevFieldNumber = 1,
     kInoFieldNumber = 2,
     kModeFieldNumber = 3,
@@ -198,6 +199,30 @@ class Stat final :
     kMtimeFieldNumber = 12,
     kCtimeFieldNumber = 13,
   };
+  // repeated string dir_list = 14;
+  int dir_list_size() const;
+  private:
+  int _internal_dir_list_size() const;
+  public:
+  void clear_dir_list();
+  const std::string& dir_list(int index) const;
+  std::string* mutable_dir_list(int index);
+  void set_dir_list(int index, const std::string& value);
+  void set_dir_list(int index, std::string&& value);
+  void set_dir_list(int index, const char* value);
+  void set_dir_list(int index, const char* value, size_t size);
+  std::string* add_dir_list();
+  void add_dir_list(const std::string& value);
+  void add_dir_list(std::string&& value);
+  void add_dir_list(const char* value);
+  void add_dir_list(const char* value, size_t size);
+  const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string>& dir_list() const;
+  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string>* mutable_dir_list();
+  private:
+  const std::string& _internal_dir_list(int index) const;
+  std::string* _internal_add_dir_list();
+  public:
+
   // int64 dev = 1;
   void clear_dev();
   int64_t dev() const;
@@ -322,6 +347,7 @@ class Stat final :
   template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
   typedef void InternalArenaConstructable_;
   typedef void DestructorSkippable_;
+  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string> dir_list_;
   int64_t dev_;
   int64_t ino_;
   int32_t mode_;
@@ -607,6 +633,81 @@ inline void Stat::_internal_set_ctime(int64_t value) {
 inline void Stat::set_ctime(int64_t value) {
   _internal_set_ctime(value);
   // @@protoc_insertion_point(field_set:Stat.ctime)
+}
+
+// repeated string dir_list = 14;
+inline int Stat::_internal_dir_list_size() const {
+  return dir_list_.size();
+}
+inline int Stat::dir_list_size() const {
+  return _internal_dir_list_size();
+}
+inline void Stat::clear_dir_list() {
+  dir_list_.Clear();
+}
+inline std::string* Stat::add_dir_list() {
+  std::string* _s = _internal_add_dir_list();
+  // @@protoc_insertion_point(field_add_mutable:Stat.dir_list)
+  return _s;
+}
+inline const std::string& Stat::_internal_dir_list(int index) const {
+  return dir_list_.Get(index);
+}
+inline const std::string& Stat::dir_list(int index) const {
+  // @@protoc_insertion_point(field_get:Stat.dir_list)
+  return _internal_dir_list(index);
+}
+inline std::string* Stat::mutable_dir_list(int index) {
+  // @@protoc_insertion_point(field_mutable:Stat.dir_list)
+  return dir_list_.Mutable(index);
+}
+inline void Stat::set_dir_list(int index, const std::string& value) {
+  dir_list_.Mutable(index)->assign(value);
+  // @@protoc_insertion_point(field_set:Stat.dir_list)
+}
+inline void Stat::set_dir_list(int index, std::string&& value) {
+  dir_list_.Mutable(index)->assign(std::move(value));
+  // @@protoc_insertion_point(field_set:Stat.dir_list)
+}
+inline void Stat::set_dir_list(int index, const char* value) {
+  GOOGLE_DCHECK(value != nullptr);
+  dir_list_.Mutable(index)->assign(value);
+  // @@protoc_insertion_point(field_set_char:Stat.dir_list)
+}
+inline void Stat::set_dir_list(int index, const char* value, size_t size) {
+  dir_list_.Mutable(index)->assign(
+    reinterpret_cast<const char*>(value), size);
+  // @@protoc_insertion_point(field_set_pointer:Stat.dir_list)
+}
+inline std::string* Stat::_internal_add_dir_list() {
+  return dir_list_.Add();
+}
+inline void Stat::add_dir_list(const std::string& value) {
+  dir_list_.Add()->assign(value);
+  // @@protoc_insertion_point(field_add:Stat.dir_list)
+}
+inline void Stat::add_dir_list(std::string&& value) {
+  dir_list_.Add(std::move(value));
+  // @@protoc_insertion_point(field_add:Stat.dir_list)
+}
+inline void Stat::add_dir_list(const char* value) {
+  GOOGLE_DCHECK(value != nullptr);
+  dir_list_.Add()->assign(value);
+  // @@protoc_insertion_point(field_add_char:Stat.dir_list)
+}
+inline void Stat::add_dir_list(const char* value, size_t size) {
+  dir_list_.Add()->assign(reinterpret_cast<const char*>(value), size);
+  // @@protoc_insertion_point(field_add_pointer:Stat.dir_list)
+}
+inline const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string>&
+Stat::dir_list() const {
+  // @@protoc_insertion_point(field_list:Stat.dir_list)
+  return dir_list_;
+}
+inline ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string>*
+Stat::mutable_dir_list() {
+  // @@protoc_insertion_point(field_mutable_list:Stat.dir_list)
+  return &dir_list_;
 }
 
 #ifdef __GNUC__

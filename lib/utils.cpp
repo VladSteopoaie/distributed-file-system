@@ -67,40 +67,74 @@ uint16_t Utils::generate_id()
     return dist(gen);
 }
 
-void Utils::struct_stat_to_proto(const struct stat* file_stat, Stat& proto_stat) {
-    // std::cout << 1 << std::endl;
-    // std::cout << file_stat << std::endl;
-    // std::cout << file_stat->st_dev << std::endl;
-    proto_stat.set_dev(file_stat->st_dev);
-    // std::cout << proto_stat.dev() << std::endl;
-    proto_stat.set_ino(file_stat->st_ino);
-    proto_stat.set_mode(file_stat->st_mode);
-    proto_stat.set_nlink(file_stat->st_nlink);
-    proto_stat.set_uid(file_stat->st_uid);
-    proto_stat.set_gid(file_stat->st_gid);
-    proto_stat.set_rdev(file_stat->st_rdev);
-    proto_stat.set_size(file_stat->st_size);
-    proto_stat.set_blksize(file_stat->st_blksize);
-    proto_stat.set_blocks(file_stat->st_blocks);
-    proto_stat.set_atime(file_stat->st_atime);
-    proto_stat.set_mtime(file_stat->st_mtime);
-    proto_stat.set_ctime(file_stat->st_ctime);
+void Utils::struct_stat_to_proto(const struct stat* object_stat, Stat& proto_stat) {
+    proto_stat.set_dev(object_stat->st_dev);
+    proto_stat.set_ino(object_stat->st_ino);
+    proto_stat.set_mode(object_stat->st_mode);
+    proto_stat.set_nlink(object_stat->st_nlink);
+    proto_stat.set_uid(object_stat->st_uid);
+    proto_stat.set_gid(object_stat->st_gid);
+    proto_stat.set_rdev(object_stat->st_rdev);
+    proto_stat.set_size(object_stat->st_size);
+    proto_stat.set_blksize(object_stat->st_blksize);
+    proto_stat.set_blocks(object_stat->st_blocks);
+    proto_stat.set_atime(object_stat->st_atime);
+    proto_stat.set_mtime(object_stat->st_mtime);
+    proto_stat.set_ctime(object_stat->st_ctime);
 }
 
-void Utils::proto_to_struct_stat(const Stat& proto_stat, struct stat* file_stat) {
-    file_stat->st_dev = proto_stat.dev();
-    file_stat->st_ino = proto_stat.ino();
-    file_stat->st_mode = proto_stat.mode();
-    file_stat->st_nlink = proto_stat.nlink();
-    file_stat->st_uid = proto_stat.uid();
-    file_stat->st_gid = proto_stat.gid();
-    file_stat->st_rdev = proto_stat.rdev();
-    file_stat->st_size = proto_stat.size();
-    file_stat->st_blksize = proto_stat.blksize();
-    file_stat->st_blocks = proto_stat.blocks();
-    file_stat->st_atime = proto_stat.atime();
-    file_stat->st_mtime = proto_stat.mtime();
-    file_stat->st_ctime = proto_stat.ctime();
+void Utils::proto_to_struct_stat(const Stat& proto_stat, struct stat* object_stat) {
+    object_stat->st_dev = proto_stat.dev();
+    object_stat->st_ino = proto_stat.ino();
+    object_stat->st_mode = proto_stat.mode();
+    object_stat->st_nlink = proto_stat.nlink();
+    object_stat->st_uid = proto_stat.uid();
+    object_stat->st_gid = proto_stat.gid();
+    object_stat->st_rdev = proto_stat.rdev();
+    object_stat->st_size = proto_stat.size();
+    object_stat->st_blksize = proto_stat.blksize();
+    object_stat->st_blocks = proto_stat.blocks();
+    object_stat->st_atime = proto_stat.atime();
+    object_stat->st_mtime = proto_stat.mtime();
+    object_stat->st_ctime = proto_stat.ctime();
+}
+
+std::vector<std::string> Utils::get_dir_list(const Stat& proto_stat)
+{
+    std::vector<std::string> result;
+
+    for (const auto& entry : proto_stat.dir_list())
+        result.push_back(entry);
+    
+    return result;
+}
+
+void Utils::set_dir_list(Stat& proto_stat, const std::vector<std::string>& dir_list)
+{
+    for (const std::string& path : dir_list)
+        proto_stat.add_dir_list(path);
+}
+
+void Utils::process_path(std::string& path) {
+    if (!path.empty() && path[0] == '/') {
+        path = path.substr(1);
+    }
+
+    // if (path.empty())
+    //     path = "./";
+}
+
+std::string Utils::get_parent_dir(std::string path) {
+    process_path(path);
+    if (path.empty() || path == ".")
+        return "..";
+
+    size_t last_slash = path.find_last_of('/');
+
+    if (last_slash == std::string::npos)
+        return ".";
+
+    return path.substr(0, last_slash);
 }
 
 std::vector<uint8_t> Utils::get_byte_array_from_int(uint32_t value)
