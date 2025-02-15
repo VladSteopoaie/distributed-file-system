@@ -16,6 +16,112 @@ struct HostInfo {
 	HostInfo() : address(""), port("") {}
 };
 
+
+static int myfs_getattr(const char *path, struct stat *stat_buf, struct fuse_file_info *file_info)
+{	
+	(void) file_info;
+	Stat proto;
+	memset(stat_buf, 0, sizeof(struct stat));
+
+	std::string proto_str = cache_client.get_file(path);
+	if (proto_str.empty())
+		proto_str = cache_client.get_dir(path);
+		if (proto_str.empty())
+			return -ENOENT;		
+
+	proto.ParseFromString(proto_str);	
+	Utils::proto_to_struct_stat(proto, stat_buf);
+
+	return 0;
+}
+
+static int myfs_mkdir(const char *path, mode_t mode)
+{
+	int error = cache_client.set_dir(path, std::to_string(mode));
+
+	if (error < 0)
+	{
+		// fprintf(stderr, "Error: failed to create the directory, please verify the logs!");
+		return -EIO;
+	}
+
+	return -error;
+}
+
+static int myfs_unlink(const char *path)
+{
+	int error = cache_client.remove_file(path);
+
+	if (error < 0)
+	{
+		// fprintf(stderr, "Error: failed to remove the file, please verify the logs!");
+		return -EIO;
+	}
+
+	return -error;
+}
+
+static int myfs_rmdir(const char *path)
+{
+	int error = cache_client.remove_dir(path);
+
+	if (error < 0)
+	{
+		// fprintf(stderr, "Error: failed to remove the file, please verify the logs!");
+		return -EIO;
+	}
+
+	return -error;
+
+}
+
+static int myfs_open(const char *path, struct fuse_file_info *file_info)
+{
+	(void) file_info;
+	std::string res = cache_client.get_file(path);
+	if (res.empty())
+		return -ENOENT;
+	return 0;
+}
+
+static int myfs_read(const char *path, char *buffer, size_t size, off_t offset, struct fuse_file_info *file_info)
+{
+	return 0;
+}
+
+
+static int myfs_write(const char *path, const char *buffer, size_t size, off_t offset, struct fuse_file_info * file_info)
+{           
+	return 0;
+}
+
+static int myfs_opendir(const char *path, struct fuse_file_info *file_info) 
+{
+	std::string result = cache_client.get_dir(path);
+	if (result.empty())
+		return -ENOENT;
+	return 0;
+}
+
+static int myfs_readdir(const char *path, void *buffer, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *file_info, enum fuse_readdir_flags flags)
+{
+	(void) offset;
+	(void) file_info;
+	(void) flags;
+
+	Stat dir_proto;
+	std::string dir_proto_str = cache_client.get_dir(path);
+	if (dir_proto_str.empty())
+		return -ENOENT;
+
+	dir_proto.ParseFromString(dir_proto_str);
+
+	for (const auto& entry : dir_proto.dir_list())
+		filler(buffer, entry.c_str(), nullptr, 0, FUSE_FILL_DIR_PLUS);
+
+	return 0;
+}
+
 static void* myfs_init(struct fuse_conn_info *connection_info, struct fuse_config *config)
 {
 	HostInfo *host_info = (struct HostInfo*) fuse_get_context()->private_data;
@@ -42,83 +148,11 @@ static int myfs_create(const char *path, mode_t mode, struct fuse_file_info *fil
 	return -error;
 }
 
-static int myfs_getattr(const char *path, struct stat *stat_buf, struct fuse_file_info *file_info)
-{	
-	(void) file_info;
-	Stat proto;
-	memset(stat_buf, 0, sizeof(struct stat));
-
-	std::string proto_str = cache_client.get_file(path);
-	if (proto_str.empty())
-		proto_str = cache_client.get_dir(path);
-		if (proto_str.empty())
-			return -ENOENT;		
-
-	proto.ParseFromString(proto_str);	
-	Utils::proto_to_struct_stat(proto, stat_buf);
-
-	return 0;
-}
-
-static int myfs_read(const char *path, char *buffer, size_t size, off_t offset, struct fuse_file_info *file_info)
-{
-	return 0;
-}
-
-static int myfs_open(const char *path, struct fuse_file_info *file_info)
-{
-	return 0;
-}
-
-static int myfs_write(const char *path, const char *buffer, size_t size, off_t offset, struct fuse_file_info * file_info)
-{           
-	return 0;
-}
-
-static int myfs_mkdir(const char *path, mode_t mode)
-{
-	int error = cache_client.set_dir(path, std::to_string(mode));
-
-	if (error < 0)
-	{
-		fprintf(stderr, "Error: failed to create the file, please verify the logs!");
-		return -EIO;
-	}
-
-	return -error;
-}
-
-static int myfs_readdir(const char *path, void *buffer, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *file_info, enum fuse_readdir_flags flags)
-{
-	(void) offset;
-	(void) file_info;
-	(void) flags;
-
-	Stat dir_proto;
-	std::string dir_proto_str = cache_client.get_dir(path);
-	if (dir_proto_str.empty())
-		return -ENOENT;
-
-	dir_proto.ParseFromString(dir_proto_str);
-
-	for (const auto& entry : dir_proto.dir_list())
-		filler(buffer, entry.c_str(), nullptr, 0, FUSE_FILL_DIR_PLUS);
-
-	return 0;
-}
-
-static int myfs_opendir(const char *path, struct fuse_file_info *file_info) 
-{
-	std::string result = cache_client.get_dir(path);
-	if (result.length() <= 0)
-		return -ENOENT;
-	return 0;
-}
-
-
 static const struct fuse_operations myfs_oper = {
 	.getattr	= myfs_getattr,
 	.mkdir 		= myfs_mkdir,
+	.unlink		= myfs_unlink,
+	.rmdir		= myfs_rmdir,
 	.opendir	= myfs_opendir,
 	.readdir	= myfs_readdir,
 	.init       = myfs_init,
@@ -132,10 +166,8 @@ static const struct fuse_operations myfs_oper = {
 	// .open		= myfs_open,
 	// .read		= myfs_read,
     // .write 	    = myfs_write,
-	// .unlink		= myfs_unlink,
 
 	// // dir specific
-	// .rmdir		= myfs_rmdir,
 	// .releasedir = myfs_releasedir
 };
 

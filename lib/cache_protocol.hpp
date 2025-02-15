@@ -29,6 +29,8 @@ namespace OperationCode {
         GET_DIR = 3,
         SET_FILE = 4,
         SET_DIR = 5,
+        RM_FILE = 6,
+        RM_DIR = 7
     };
 
     uint8_t to_byte(Type opcode);

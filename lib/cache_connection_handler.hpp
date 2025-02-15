@@ -30,7 +30,11 @@ namespace CacheAPI {
         void set_memcached_object(std::string key, std::string value, time_t expiration, uint32_t flags);
         void set_memcached_object(std::string key, std::string value);
         asio::awaitable<void> set_memcached_object_async(std::string key, std::string value, time_t expiration, uint32_t flags);
+        
         std::string get_memcached_object(std::string key);
+
+        void remove_memcached_object(std::string key);
+        asio::awaitable<void> remove_memcached_object_async(std::string key);
        
         void read_socket_async();
         void write_socket_async();
@@ -43,6 +47,14 @@ namespace CacheAPI {
         std::string get_local_file(std::string path);
         std::string get_local_dir(std::string path);
         void get(const CachePacket& request, CachePacket& response, bool is_file);
+
+        void remove_local_file(std::string path);
+        void remove_local_dir(std::string path);
+        void remove(const CachePacket& request, CachePacket& response, bool is_file);
+
+        std::string update_local_file(std::string path);
+        std::string update_local_dir(std::string path);
+        void update(const CachePacket& request, CachePacket& response, bool is_file);
 
     public:
         CacheConnectionHandler(asio::io_context& context, memcached_st* mem_client, uint16_t mem_port, std::string storage_dir);

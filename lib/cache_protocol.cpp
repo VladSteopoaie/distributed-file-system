@@ -82,6 +82,10 @@ uint8_t OperationCode::to_byte(OperationCode::Type opcode)
             return 4;
         case OperationCode::Type::SET_DIR:
             return 5;
+        case OperationCode::Type::RM_FILE:
+            return 6;
+        case OperationCode::Type::RM_DIR:
+            return 7;
         default:
             return -1;
     }
@@ -103,6 +107,10 @@ OperationCode::Type OperationCode::from_byte(uint8_t byte)
             return OperationCode::Type::SET_FILE;
         case 5:
             return OperationCode::Type::SET_DIR;
+        case 6:
+            return OperationCode::Type::RM_FILE;
+        case 7:
+            return OperationCode::Type::RM_DIR;
         default:
             return OperationCode::Type::UNKNOWN;
     }
@@ -124,6 +132,10 @@ std::string OperationCode::to_string(OperationCode::Type opcode)
             return "SET_FILE";
         case OperationCode::Type::SET_DIR:
             return "SET_DIR";
+        case OperationCode::Type::RM_FILE:
+            return "RM_FILE";
+        case OperationCode::Type::RM_DIR:
+            return "RM_DIR";
         default:
             return "UNKNOWN";
     }

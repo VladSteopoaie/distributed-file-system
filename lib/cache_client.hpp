@@ -33,6 +33,9 @@ namespace CacheAPI {
   
         asio::awaitable<std::string> get_async(std::string key, bool is_file);
         std::string get(std::string key, bool is_file);
+
+        asio::awaitable<int> remove_async(std::string key, bool is_file);
+        int remove(std::string key, bool is_file);
     public:
         CacheClient(const CacheClient&) = delete;
         CacheClient& operator= (const CacheClient&) = delete;
@@ -48,6 +51,8 @@ namespace CacheAPI {
         int set_dir(std::string key, std::string value);
         std::string get_file(std::string key);
         std::string get_dir(std::string key);
+        int remove_file(std::string key);
+        int remove_dir(std::string key);
     };
 }
 

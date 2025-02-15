@@ -64,6 +64,13 @@ void CacheConnectionHandler::handle_request(const CachePacket& request, CachePac
         case OperationCode::Type::SET_DIR:
             set(request, response, false);
             break;
+        case OperationCode::Type::RM_FILE:
+            remove(request, response, true);
+            break;
+        case OperationCode::Type::RM_DIR:
+            remove(request, response, false);
+            break;
+        
         default:
             response.rescode = ResultCode::to_byte(ResultCode::Type::INVOP);
             break;
@@ -119,6 +126,31 @@ std::string CacheConnectionHandler::get_memcached_object(std::string key)
     }
 
     return result;
+}
+
+
+void CacheConnectionHandler::remove_memcached_object(std::string key) 
+{
+    memcached_return_t result;
+    result = memcached_delete(mem_client, key.c_str(), key.length(), 0);
+
+    if (result != MEMCACHED_SUCCESS)
+    {
+        throw std::runtime_error(std::format("set_memcached_object: {}", memcached_strerror(mem_client, result)));
+    }
+}
+
+asio::awaitable<void> CacheConnectionHandler::remove_memcached_object_async(std::string key) 
+{
+    try {
+        remove_memcached_object(key);
+    }
+    catch (std::exception& e)
+    {
+        SPDLOG_ERROR(std::format("remove_memcached_object_async: {}", e.what()));
+    }
+
+    co_return;
 }
 
 void CacheConnectionHandler::read_socket_async()
@@ -237,8 +269,8 @@ void CacheConnectionHandler::set(const CachePacket& request, CachePacket& respon
         uint32_t flags = request.flags;
         time_t time = static_cast<time_t>(request.time);
         std::string path = Utils::get_string_from_byte_array(request.key);
-        Utils::process_path(path);
-        path = storage_dir + path;
+        Utils::process_path(path, storage_dir);
+        //path = storage_dir + path;
         mode_t mode = std::stoul(Utils::get_string_from_byte_array(request.value));
 
         std::string value;
@@ -316,8 +348,8 @@ void CacheConnectionHandler::get(const CachePacket& request, CachePacket& respon
 {
     try {
         std::string path = Utils::get_string_from_byte_array(request.key);
-        Utils::process_path(path);
-        path = storage_dir + path;
+        Utils::process_path(path, storage_dir);
+        //path = storage_dir + path;
         std::string value;
 
         if (is_file)
@@ -337,8 +369,53 @@ void CacheConnectionHandler::get(const CachePacket& request, CachePacket& respon
         std::string message = std::format("get: {}", e.what());
         SPDLOG_ERROR(message);
         response.rescode = ResultCode::to_byte(ResultCode::Type::ERRMSG);
-        response.message_len = static_cast<uint16_t>(message.length());
-        response.message = Utils::get_byte_array_from_string(message);
+        response.message_len = 4;
+        response.message = Utils::get_byte_array_from_int(errno);
+        // response.message_len = static_cast<uint16_t>(message.length());
+        // response.message = Utils::get_byte_array_from_string(message);
+    }
+
+}
+
+
+void CacheConnectionHandler::remove_local_file(std::string path) 
+{
+    int res = unlink(path.c_str());
+    if (res != 0)
+        throw std::runtime_error(std::format("remove_local_dir: {}", std::strerror(errno)));
+}
+
+void CacheConnectionHandler::remove_local_dir(std::string path) 
+{
+    int res = rmdir(path.c_str());
+    if (res != 0)
+        throw std::runtime_error(std::format("remove_local_dir: {}", std::strerror(errno)));
+}
+
+void CacheConnectionHandler::remove(const CachePacket& request, CachePacket& response, bool is_file) 
+{
+    try {
+        std::string path = Utils::get_string_from_byte_array(request.key);
+        Utils::process_path(path, storage_dir);
+
+        if (is_file)
+            remove_local_file(path);
+        else
+            remove_local_dir(path);
+
+        asio::co_spawn(context, remove_memcached_object_async(path), asio::detached);
+
+        response.rescode = ResultCode::to_byte(ResultCode::Type::SUCCESS);
+    }
+    catch (std::exception& e)
+    {
+        std::string message = std::format("get: {}", e.what());
+        SPDLOG_ERROR(message);
+        response.rescode = ResultCode::to_byte(ResultCode::Type::ERRMSG);
+        response.message_len = 4;
+        response.message = Utils::get_byte_array_from_int(errno);
+        // response.message_len = static_cast<uint16_t>(message.length());
+        // response.message = Utils::get_byte_array_from_string(message);
     }
 
 }

@@ -208,6 +208,86 @@ std::string CacheClient::get(std::string key, bool is_file)
     }
 }
 
+asio::awaitable<int> CacheClient::remove_async(std::string key, bool is_file)
+{
+    try {
+        CachePacket request, response;
+        request.id = Utils::generate_id();
+        if (is_file)
+            request.opcode = OperationCode::to_byte(OperationCode::Type::RM_FILE);
+        else 
+            request.opcode = OperationCode::to_byte(OperationCode::Type::RM_DIR);
+        // request.time = time;
+        // request.flags = flags;
+        request.key_len = key.length();
+        // request.value_len = value.length();
+        request.key = Utils::get_byte_array_from_string(key);
+        // request.value = Utils::get_byte_array_from_string(value);
+        co_await send_request_async(request);
+        co_await receive_response_async(response);
+            
+        if ((response.id != request.id) || response.rescode == ResultCode::Type::ERRMSG)
+        {
+            int error;
+            if (response.message_len == 0)
+            {
+                SPDLOG_ERROR("Unknown server error");
+                error = -1;
+            }
+            else 
+            {
+                int error = Utils::get_int_from_byte_array(response.message);
+                SPDLOG_ERROR(std::format("Server error: {}", error));
+                if (error == 0) error = -1;
+            }             
+
+            co_return error;
+        }
+
+        if (response.rescode == ResultCode::Type::SUCCESS)
+        {
+            SPDLOG_INFO("Stored!");
+            co_return 0;
+        } 
+        
+        SPDLOG_ERROR("Invalid packet from server.");
+        co_return -1;
+    }
+    catch (std::exception& e)
+    {
+        SPDLOG_ERROR(std::format("set_async: {}", e.what()));
+        co_return -1;
+    }
+
+}
+
+int CacheClient::remove(std::string key, bool is_file)
+{
+    std::promise<int> result_promise;
+    std::future<int> result_future = result_promise.get_future();
+
+    asio::co_spawn(
+        context,
+        [&]() -> asio::awaitable<void> {
+            int result = co_await remove_async(key, is_file);
+            result_promise.set_value(result);
+            co_return;
+        },
+        asio::detached
+    );
+
+    context.run();
+    context.restart();
+
+    try {
+        return result_future.get();
+    }
+    catch (...)
+    {
+        return -1;
+    }
+}
+
 // public
 CacheClient::CacheClient()
     : CacheClient("")
@@ -342,4 +422,14 @@ std::string CacheClient::get_file(std::string key)
 std::string CacheClient::get_dir(std::string key)
 {
     return get(key, false);
+}
+
+int CacheClient::remove_file(std::string key)
+{
+    return remove(key, true);
+}
+
+int CacheClient::remove_dir(std::string key)
+{
+    return remove(key, false);
 }
