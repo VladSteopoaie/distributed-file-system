@@ -3,20 +3,33 @@
 /*################################*/
 /*---------[ ResultCode ]---------*/
 /*################################*/
+// namespace ResultCode {
+//     enum Type {
+//         UNKNOWN, // type unkown
+//         SUCCESS = 0, // no problems here :)
+//         INVPKT = 1, // invalid packet error
+//         INVOP = 2, // invalid operation
+//         NOLOCAL = 3, // no local memcached servers
+//         ERRMSG = 4, // error with a message
+//     };
 
-uint8_t ResultCode::to_byte(ResultCode::Type rescode)
+//     uint8_t to_byte(Type rescode);
+//     Type from_byte(uint8_t byte);
+//     std::string to_string(Type rescode);
+// }
+uint8_t ResultCode::to_byte(Type rescode)
 {
     switch (rescode)
     {
-        case ResultCode::Type::SUCCESS:
+        case Type::SUCCESS:
             return 0;
-        case ResultCode::Type::INVPKT:
+        case Type::INVPKT:
             return 1;
-        case ResultCode::Type::INVOP:
+        case Type::INVOP:
             return 2;
-        case ResultCode::Type::NOLOCAL:
+        case Type::NOLOCAL:
             return 3;
-        case ResultCode::Type::ERRMSG:
+        case Type::ERRMSG:
             return 4;
         default:
             return -1;
@@ -28,64 +41,68 @@ ResultCode::Type ResultCode::from_byte(uint8_t byte)
     switch (byte)
     {
         case 0:
-            return ResultCode::Type::SUCCESS;
+            return Type::SUCCESS;
         case 1:
-            return ResultCode::Type::INVPKT;
+            return Type::INVPKT;
         case 2:
-            return ResultCode::Type::INVOP;
+            return Type::INVOP;
         case 3:
-            return ResultCode::Type::NOLOCAL;
+            return Type::NOLOCAL;
         case 4:
-            return ResultCode::Type::ERRMSG;
+            return Type::ERRMSG;
         default:
-            return ResultCode::Type::UNKNOWN;
+            return Type::UNKNOWN;
     }
 }
 
-std::string ResultCode::to_string(ResultCode::Type rescode)
+std::string ResultCode::to_string(Type rescode)
 {
     switch (rescode)
     {
-        case ResultCode::Type::SUCCESS:
+        case Type::SUCCESS:
             return "SUCCESS";
-        case ResultCode::Type::INVPKT:
+        case Type::INVPKT:
             return "INVPKT";
-        case ResultCode::Type::INVOP:
+        case Type::INVOP:
             return "INVOP";
-        case ResultCode::Type::NOLOCAL:
+        case Type::NOLOCAL:
             return "NOLOCAL";
-        case ResultCode::Type::ERRMSG:
+        case Type::ERRMSG:
             return "ERRMSG";
         default:
             return "UNKNOWN";
     }
 }
 
-/*#######################################*/
+/*###################################*/
 /*---------[ OperationCode ]---------*/
-/*#######################################*/
+/*###################################*/
 
 
 uint8_t OperationCode::to_byte(OperationCode::Type opcode)
 {
     switch (opcode)
     {
-        case OperationCode::Type::NOP:
+        case Type::NOP:
             return 0;
-        case OperationCode::Type::INIT:
+        case Type::INIT:
             return 1;
-        case OperationCode::Type::GET_FILE:
+        case Type::GET_FILE:
             return 2;
-        case OperationCode::Type::GET_DIR:
+        case Type::GET_DIR:
             return 3;
-        case OperationCode::Type::SET_FILE:
+        case Type::SET_FILE:
             return 4;
-        case OperationCode::Type::SET_DIR:
+        case Type::SET_DIR:
             return 5;
-        case OperationCode::Type::RM_FILE:
+        case Type::RM_FILE:
             return 6;
-        case OperationCode::Type::RM_DIR:
+        case Type::RM_DIR:
             return 7;
+        case Type::CH_FILE:
+            return 8;
+        case Type::CH_DIR:
+            return 9;
         default:
             return -1;
     }
@@ -96,23 +113,27 @@ OperationCode::Type OperationCode::from_byte(uint8_t byte)
     switch (byte)
     {
         case 0:
-            return OperationCode::Type::NOP;
+            return Type::NOP;
         case 1:
-            return OperationCode::Type::INIT;
+            return Type::INIT;
         case 2:
-            return OperationCode::Type::GET_FILE;
+            return Type::GET_FILE;
         case 3:
-            return OperationCode::Type::GET_DIR;
+            return Type::GET_DIR;
         case 4:
-            return OperationCode::Type::SET_FILE;
+            return Type::SET_FILE;
         case 5:
-            return OperationCode::Type::SET_DIR;
+            return Type::SET_DIR;
         case 6:
-            return OperationCode::Type::RM_FILE;
+            return Type::RM_FILE;
         case 7:
-            return OperationCode::Type::RM_DIR;
+            return Type::RM_DIR;
+        case 8:
+            return Type::CH_FILE;
+        case 9:
+            return Type::CH_DIR;
         default:
-            return OperationCode::Type::UNKNOWN;
+            return Type::UNKNOWN;
     }
 }
 
@@ -120,22 +141,77 @@ std::string OperationCode::to_string(OperationCode::Type opcode)
 {
     switch (opcode)
     {
-        case OperationCode::Type::NOP:
+        case Type::NOP:
             return "NOP";
-        case OperationCode::Type::INIT:
+        case Type::INIT:
             return "INIT";
-        case OperationCode::Type::GET_FILE:
+        case Type::GET_FILE:
             return "GET_FILE";
-        case OperationCode::Type::GET_DIR:
+        case Type::GET_DIR:
             return "GET_DIR";
-        case OperationCode::Type::SET_FILE:
+        case Type::SET_FILE:
             return "SET_FILE";
-        case OperationCode::Type::SET_DIR:
+        case Type::SET_DIR:
             return "SET_DIR";
-        case OperationCode::Type::RM_FILE:
+        case Type::RM_FILE:
             return "RM_FILE";
-        case OperationCode::Type::RM_DIR:
+        case Type::RM_DIR:
             return "RM_DIR";
+        case Type::CH_FILE:
+            return "CH_FILE";
+        case Type::CH_DIR:
+            return "CH_DIR";
+        default:
+            return "UNKNOWN";
+    }
+}
+/*################################*/
+/*---------[ UpdateCode ]---------*/
+/*################################*/
+
+uint8_t UpdateCode::to_byte(Type opcode)
+{
+    switch (opcode)
+    {
+        case Type::CHMOD:
+            return 1;
+        case Type::CHOWN:
+            return 2;
+        case Type::RENAME:
+            return 3;
+        
+        default:
+            return -1;
+    }
+}
+
+UpdateCode::Type UpdateCode::from_byte(uint8_t byte)
+{
+    switch (byte)
+    {
+        case 1:
+            return Type::CHMOD;
+        case 2:
+            return Type::CHOWN;
+        case 3:
+            return Type::RENAME;
+        
+        default:
+            return Type::UNKNOWN;
+    }
+}
+
+std::string UpdateCode::to_string(UpdateCode::Type opcode)
+{
+    switch (opcode)
+    {
+        case Type::CHMOD:
+            return "CHMOD";
+        case Type::CHOWN:
+            return "CHOWN";
+        case Type::RENAME:
+            return "RENAME";
+
         default:
             return "UNKNOWN";
     }
@@ -181,7 +257,7 @@ std::vector<uint8_t> BytePacketBuffer::get_buffer() const
 }
 
 // current position within buffer
-size_t BytePacketBuffer::get_possition() const
+size_t BytePacketBuffer::get_position() const
 {
     return c_pos;
 }
@@ -208,19 +284,19 @@ uint8_t BytePacketBuffer::get_byte(size_t pos) const
 }
 
 // get a range of bytes from buffer without changing the position
-// uint8_t* BytePacketBuffer::get_range(size_t start, size_t len)
-// {
-//     if (start + len >= buffer.size())
-//         throw std::runtime_error(
-//             std::format("get_range: Index outside of bounds: tried {} and {}, but size is {}", start, len, buffer.size())
-//         );
+uint8_t* BytePacketBuffer::get_range(size_t start, size_t len)
+{
+    if (start + len >= buffer.size())
+        throw std::runtime_error(
+            std::format("get_range: Index outside of bounds: tried {} and {}, but size is {}", start, len, buffer.size())
+        );
 
-//     uint8_t res[len + 1];
-//     std::copy(buffer.begin() + start, buffer.begin() + start + len, res);
-//     res[len] = 0;
+    uint8_t res[len + 1];
+    std::copy(buffer.begin() + start, buffer.begin() + start + len, res);
+    res[len] = 0;
 
-//     return res;
-// }
+    return res;
+}
 
 // read one byte from the buffer's position and change the position
 uint8_t BytePacketBuffer::read_u8()
@@ -390,7 +466,7 @@ size_t CachePacket::to_buffer(std::vector<uint8_t>& final_buffer) const
     packet_buffer.write_u8(flags);
     packet_buffer.write_u16(message_len);
     // packet_buffer.write_u8(0); // padding 8
-    packet_buffer.step(1); // skipping 3 bytes (padding) 
+    packet_buffer.step(1); // skipping 1 byte (padding) 
 
     packet_buffer.write_u32(time);
     packet_buffer.write_u32(key_len);
@@ -430,5 +506,76 @@ std::string CachePacket::to_string() const
     result += Utils::get_string_from_byte_array(value);
     result += "\n";
 
+    return result;
+}
+
+/*###################################*/
+/*---------[ UpdateCommand ]---------*/
+/*###################################*/
+
+UpdateCommand::UpdateCommand() {
+    command_size = 0;
+    opcode = 0;
+    argc = 0;
+    argv = std::vector<std::string>();
+}
+
+UpdateCommand::UpdateCommand(const uint8_t* buffer, size_t len)
+{
+    from_buffer(buffer, len);
+}
+
+void UpdateCommand::from_buffer(const uint8_t* buffer, size_t len)
+{
+    command_size = 0;
+    BytePacketBuffer command_buffer = BytePacketBuffer(buffer, len);
+
+    opcode = command_buffer.read_u8();
+    argc = command_buffer.read_u8();
+    command_size += 2; 
+
+    // for each argument the length of it is the first byte
+    for (uint8_t i = 0; i < argc; i ++)
+    {
+        uint8_t arg_size = command_buffer.read_u8();
+        command_size += arg_size + 1; // len byte + size of the string
+
+        argv.push_back(std::string(
+            (char*)command_buffer.get_range(command_buffer.get_position(), arg_size)
+        ));
+        command_buffer.step(arg_size);
+    }
+}
+
+size_t UpdateCommand::to_buffer(std::vector<uint8_t>& final_buffer) const 
+{
+    BytePacketBuffer command_buffer = BytePacketBuffer();
+    final_buffer.resize(command_size);
+    command_buffer.resize(command_size);
+
+    command_buffer.write_u8(opcode);
+    command_buffer.write_u8(argc);
+
+    for (std::string arg : argv) 
+    {
+        command_buffer.write_u8(static_cast<uint8_t> (arg.length()));
+        for (size_t i = 0; i < arg.length(); i ++)
+            command_buffer.write_u8(arg[i]);
+    }
+
+    return command_size;
+}
+
+std::string UpdateCommand::to_string() const 
+{
+    std::string result = "UpdateCommand:\n";
+    result += "--\\ opcode: " + UpdateCode::to_string(UpdateCode::from_byte(opcode)) + "\n";
+    result += "--\\ argc: " + std::to_string(argc) +  "\n";
+
+    for (uint8_t i = 0; i < argc; i ++)
+    {
+        result += "----\\ argv[" + std::to_string(i) + "] = " + argv[i] + "\n";
+    }
+    result += "\n";
     return result;
 }

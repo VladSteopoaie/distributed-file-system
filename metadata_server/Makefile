@@ -14,7 +14,7 @@ SRCDIR = ../lib
 TARGET = $(BINDIR)/$(SRC:.cpp=)
 
 # Source files
-SRCS = metadata.pb.cpp utils.cpp cache_protocol.cpp cache_server.cpp cache_client.cpp cache_connection_handler.cpp
+SRCS = metadata.pb.cpp utils.cpp cache_protocol.cpp cache_server.cpp cache_client.cpp file_mngr.cpp cache_connection_handler.cpp
 # SRCS = $(SRCFILES:%.cpp=$(SRCDIR)/%.cpp)
 
 # Object files

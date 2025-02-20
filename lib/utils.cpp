@@ -2,7 +2,8 @@
 
 void Utils::read_conf_file(std::string conf_file, std::string& conf_string)
 {
-    try {
+    try 
+    {
         std::ifstream file (conf_file);
 
         if (!file)

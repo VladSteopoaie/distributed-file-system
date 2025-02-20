@@ -22,7 +22,8 @@
 #include <unistd.h>
 #include "metadata.pb.h"
 
-namespace Utils {
+namespace Utils 
+{
     void read_conf_file(std::string conf_file, std::string& conf_string);
     void prepare_conf_string(std::string& conf_string);
     uint16_t generate_id();

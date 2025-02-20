@@ -75,12 +75,35 @@ static int myfs_rmdir(const char *path)
 
 }
 
+static int myfs_rename(const char *old_path, const char *new_path, unsigned int flags)
+{
+
+}
+
+static int myfs_chmod(const char *path, mode_t mode, struct fuse_file_info *file_info)
+{
+
+}
+
+static int myfs_chown(const char *path, uid_t uid, gid_t gid, struct fuse_file_info *file_info)
+{
+	
+}
+
 static int myfs_open(const char *path, struct fuse_file_info *file_info)
 {
 	(void) file_info;
 	std::string res = cache_client.get_file(path);
 	if (res.empty())
 		return -ENOENT;
+	return 0;
+}
+
+int myfs_release(const char *path, struct fuse_file_info *file_info)
+{
+	(void) path;
+	(void) file_info;
+
 	return 0;
 }
 
@@ -122,6 +145,13 @@ static int myfs_readdir(const char *path, void *buffer, fuse_fill_dir_t filler, 
 	return 0;
 }
 
+static int myfs_releasedir(const char *path, struct fuse_file_info *file_info)
+{
+	(void) path;
+	(void) file_info;
+	return 0;
+}
+
 static void* myfs_init(struct fuse_conn_info *connection_info, struct fuse_config *config)
 {
 	HostInfo *host_info = (struct HostInfo*) fuse_get_context()->private_data;
@@ -148,27 +178,32 @@ static int myfs_create(const char *path, mode_t mode, struct fuse_file_info *fil
 	return -error;
 }
 
+static int myfs_utimens(const char *path, const struct timespec tv[2], struct fuse_file_info *file_info)
+{
+	(void) path;
+	(void) rv;
+	(void) file_info;
+	return 0;
+}
+
 static const struct fuse_operations myfs_oper = {
 	.getattr	= myfs_getattr,
 	.mkdir 		= myfs_mkdir,
 	.unlink		= myfs_unlink,
 	.rmdir		= myfs_rmdir,
-	.opendir	= myfs_opendir,
-	.readdir	= myfs_readdir,
-	.init       = myfs_init,
-	.create 	= myfs_create,
-	// .rename 	= myfs_rename,
-	// .chmod	= myfs_chmod,
-	// .chown	= myfs_chown,
-	// .release	= myfs_release,
-
-	// // file specific
-	// .open		= myfs_open,
+	.rename		= myfs_rename, // todo
+	.chmod		= myfs_chmod, // todo
+	.chown		= myfs_chown, // todo
+	.open		= myfs_open,
 	// .read		= myfs_read,
     // .write 	    = myfs_write,
-
-	// // dir specific
-	// .releasedir = myfs_releasedir
+	.release	= myfs_release,
+	.opendir	= myfs_opendir,
+	.readdir	= myfs_readdir,
+	.releasedir = myfs_releasedir
+	.init       = myfs_init,
+	.create 	= myfs_create,
+	.utimens	= myfs_utimens,
 };
 
 int main(int argc, char** argv)

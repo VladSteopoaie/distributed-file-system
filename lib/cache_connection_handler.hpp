@@ -5,8 +5,8 @@
 #define ASIO_NO_DEPRECATED // no need for deprecated stuff
 #define ASIO_HAS_STD_COROUTINE // c++20 coroutines needed
 #include <asio.hpp>
-#include <dirent.h>
 #include "cache_protocol.hpp"
+#include "file_mngr.hpp"
 
 
 using asio::ip::tcp;
@@ -40,20 +40,20 @@ namespace CacheAPI {
         void write_socket_async();
         void init_connection(CachePacket& response);
 
-        std::string set_local_file(std::string path, mode_t mode);
-        std::string set_local_dir(std::string path, mode_t mode);
+        // std::string set_local_file(std::string path, mode_t mode);
+        // std::string set_local_dir(std::string path, mode_t mode);
         void set(const CachePacket& request, CachePacket& response, bool is_file);
         
-        std::string get_local_file(std::string path);
-        std::string get_local_dir(std::string path);
+        // std::string get_local_file(std::string path);
+        // std::string get_local_dir(std::string path);
         void get(const CachePacket& request, CachePacket& response, bool is_file);
 
-        void remove_local_file(std::string path);
-        void remove_local_dir(std::string path);
+        // void remove_local_file(const std::string& path) const;
+        // void remove_local_dir(const std::string& path) const;
         void remove(const CachePacket& request, CachePacket& response, bool is_file);
 
-        std::string update_local_file(std::string path);
-        std::string update_local_dir(std::string path);
+        // std::string update_local_file(const std::string& path, const UpdateCommand&) const;
+        // std::string update_local_dir(const std::string& path, const UpdateCommand&) const;
         void update(const CachePacket& request, CachePacket& response, bool is_file);
 
     public:

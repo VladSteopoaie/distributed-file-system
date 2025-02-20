@@ -3,7 +3,6 @@
 
 #include "utils.hpp"
 
-
 namespace ResultCode {
     enum Type {
         UNKNOWN, // type unkown
@@ -30,7 +29,9 @@ namespace OperationCode {
         SET_FILE = 4,
         SET_DIR = 5,
         RM_FILE = 6,
-        RM_DIR = 7
+        RM_DIR = 7,
+        CH_FILE = 8, // change commands
+        CH_DIR = 9,
     };
 
     uint8_t to_byte(Type opcode);
@@ -38,6 +39,18 @@ namespace OperationCode {
     std::string to_string(Type opcode);
 }
 
+namespace UpdateCode {
+    enum Type {
+        UNKNOWN,
+        CHMOD = 1,
+        CHOWN = 2,
+        RENAME = 3,
+    };
+
+    uint8_t to_byte(Type opcode);
+    Type from_byte(uint8_t byte);
+    std::string to_string(Type opcode);
+}
 
 // From: https://github.com/VladSteopoaie/DNS-tunneling/blob/main/dns_server/modules/dns_module.h
 
@@ -56,7 +69,7 @@ public:
     size_t get_size() const;
     std::vector<uint8_t> get_buffer() const;
 
-    size_t get_possition() const;
+    size_t get_position() const;
 
     // move the position over a specific number of bytes
     void step(size_t steps);
@@ -68,7 +81,7 @@ public:
     uint8_t get_byte(size_t pos) const;
 
     // get a range of bytes from buf without changing the position
-    // uint8_t* get_range(size_t start, size_t len);
+    uint8_t* get_range(size_t start, size_t len);
 
     // read one byte from the buffer's position and change the position
     uint8_t read_u8();
@@ -106,6 +119,20 @@ struct CachePacket {
 
     CachePacket();
     CachePacket(const uint8_t* buffer, size_t len);
+
+    void from_buffer(const uint8_t* buffer, size_t len);
+    size_t to_buffer(std::vector<uint8_t>& buffer) const;
+    std::string to_string() const;
+};
+
+struct UpdateCommand {
+    uint16_t command_size;
+    uint8_t opcode;
+    uint8_t argc;
+    std::vector<std::string> argv;
+
+    UpdateCommand();
+    UpdateCommand(const uint8_t* buffer, size_t len);
 
     void from_buffer(const uint8_t* buffer, size_t len);
     size_t to_buffer(std::vector<uint8_t>& buffer) const;
