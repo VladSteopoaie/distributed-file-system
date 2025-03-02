@@ -3,13 +3,16 @@
 using namespace CacheAPI;
 
 // public
-CacheConnectionHandler::CacheConnectionHandler(asio::io_context& context, memcached_st* mem_client, uint16_t mem_port, std::string storage_dir)
+CacheConnectionHandler::CacheConnectionHandler(asio::io_context& context, memcached_st* mem_client, uint16_t mem_port, std::string file_metadata_dir, std::string dir_metadata_dir)
     : context(context)
     , socket(context)
     , mem_client(mem_client)
     , mem_port(mem_port)
-    , storage_dir(storage_dir)
-{}
+    , file_metadata_dir(file_metadata_dir)
+    , dir_metadata_dir(dir_metadata_dir)
+{
+    // TODO: check if directories exist, and ensure they have / at the end
+}
 
 CacheConnectionHandler::~CacheConnectionHandler() {
     socket.close();
@@ -222,76 +225,40 @@ void CacheConnectionHandler::init_connection(CachePacket& response)
     response.message.push_back(mem_port & 0xFF);
 }
 
-// std::string FileMngr::set_local_file(std::string file_path, mode_t mode)
-// {
-//     // std::string file_path = storage_dir + path;
-//     SPDLOG_DEBUG(std::format("Path: {}", file_path));
-//     std::string result;
-//     Stat file_proto;
-//     struct stat file_stat;
-//     int fd;
-
-//     fd = open(file_path.c_str(), O_CREAT | O_RDWR, mode);
-//     if (fd < 0)
-//         throw std::runtime_error(std::format("set_local_file: {}", std::strerror(errno)));
-
-//     if (fstat(fd, &file_stat) != 0)
-//         throw std::runtime_error(std::format("set_local_file: {}", std::strerror(errno)));
-
-//     Utils::struct_stat_to_proto(&file_stat, file_proto);
-//     file_proto.SerializeToString(&result);
-//     if (write(fd, result.c_str(), result.length()) < 0)
-//         throw std::runtime_error(std::format("set_local_file: {}", std::strerror(errno)));
-
-//     return result;
-// }
-
-// std::string FileMngr::set_local_dir(std::string dir_path, mode_t mode)
-// {
-//     // std::string dir_path = storage_dir + path;
-//     SPDLOG_DEBUG(std::format("Path: {}", dir_path));
-//     std::string result_string;
-//     Stat dir_proto;
-//     struct stat dir_stat;
-//     int result;
-
-//     result = mkdir(dir_path.c_str(), mode);
-//     if (result != 0)
-//         throw std::runtime_error(std::format("set_local_dir: {}", std::strerror(errno)));
-
-//     if (stat(dir_path.c_str(), &dir_stat) != 0)
-//         throw std::runtime_error(std::format("set_local_dir: {}", std::strerror(errno)));
-
-//     Utils::struct_stat_to_proto(&dir_stat, dir_proto);
-//     dir_proto.SerializeToString(&result_string);
-
-
-//     return result_string;
-// }
-
 void CacheConnectionHandler::set(const CachePacket& request, CachePacket& response, bool is_file)
 {
     try {
         uint32_t flags = request.flags;
         time_t time = static_cast<time_t>(request.time);
         std::string path = Utils::get_string_from_byte_array(request.key);
-        Utils::process_path(path, storage_dir);
-        //path = storage_dir + path;
+        std::string file_path = Utils::process_path(path, file_metadata_dir);
+        std::string dir_path = Utils::process_path(path, dir_metadata_dir);
+        
         mode_t mode = std::stoul(Utils::get_string_from_byte_array(request.value));
 
         std::string value;
         if (is_file)
-            value = FileMngr::set_local_file(path, mode);
+        {
+            value = FileMngr::set_local_file(file_path, mode);
+        }
         else
-            value = FileMngr::set_local_dir(path, mode);
-        
-        asio::co_spawn(context, set_memcached_object_async(path, value, time, flags), asio::detached);
+        {
+            // creating two directories
+            // 1. for the folder hierarchy of the file system
+            FileMngr::set_local_dir(file_path, mode);
+            // 2. for storing the metadata about the directory (the file with metadata will be stored in .this file)
+            // inside the directory
+            FileMngr::set_local_dir(file_path, dir_path, mode);
+            value = FileMngr::get_local_dir(file_path, dir_path);
+        }
+
+        asio::co_spawn(context, set_memcached_object_async(file_path, value, time, flags), asio::detached);
         
         // when creating an object we need to update the parent directory in 
         // the memcached server
-        std::string dir_path = Utils::get_parent_dir(path);
-        std::string dir_value = FileMngr::get_local_dir(dir_path);
-        asio::co_spawn(context, set_memcached_object_async(dir_path, dir_value, time, flags), asio::detached);
+        std::string parent_path = Utils::get_parent_dir(path);
+        std::string parent_value = FileMngr::get_local_dir(file_metadata_dir + parent_path, dir_metadata_dir + parent_path, true);
+        asio::co_spawn(context, set_memcached_object_async(file_metadata_dir + parent_path, parent_value, time, flags), asio::detached);
 
         response.rescode = ResultCode::to_byte(ResultCode::Type::SUCCESS);
     }
@@ -305,63 +272,21 @@ void CacheConnectionHandler::set(const CachePacket& request, CachePacket& respon
     }
 }
 
-// std::string CacheConnectionHandler::get_local_file(std::string file_path)
-// {
-//     SPDLOG_DEBUG(std::format("Path: {}", file_path));
-//     std::ifstream file(file_path);
-
-//     if (!file)
-//         throw std::runtime_error(std::format("get_local_file: {}", std::strerror(errno)));
-
-//     std::ostringstream buf;
-//     buf << file.rdbuf();
-//     return buf.str();
-// }
-
-// std::string CacheConnectionHandler::get_local_dir(std::string dir_path)
-// {
-//     Stat dir_proto;
-//     struct stat dir_stat;
-//     struct dirent* entry;
-//     SPDLOG_DEBUG(std::format("Path: {}", dir_path));
-//     DIR* dir = opendir(dir_path.c_str());
-//     std::string result;
-
-//     if (!dir)
-//         throw std::runtime_error(std::format("get_local_dir: {}", std::strerror(errno)));
-
-//     if (stat(dir_path.c_str(), &dir_stat) != 0)
-//         throw std::runtime_error(std::format("get_local_dir: {}", std::strerror(errno)));
-
-//     Utils::struct_stat_to_proto(&dir_stat, dir_proto);
-
-//     errno = 0;
-//     while ((entry = readdir(dir)) != nullptr)
-//         dir_proto.add_dir_list(entry->d_name);
-
-//     if (errno != 0)
-//         throw std::runtime_error(std::format("get_local_dir: {}", std::strerror(errno)));
-
-
-//     dir_proto.SerializeToString(&result);
-
-//     return result;
-// }
-
 void CacheConnectionHandler::get(const CachePacket& request, CachePacket& response, bool is_file)
 {
     try {
         std::string path = Utils::get_string_from_byte_array(request.key);
-        Utils::process_path(path, storage_dir);
+        std::string file_path = Utils::process_path(path, file_metadata_dir);
+        std::string dir_path = Utils::process_path(path, dir_metadata_dir);
         std::string value;
 
         if (is_file)
-            value = FileMngr::get_local_file(path);
+            value = FileMngr::get_local_file(file_path);
         else
-            value = FileMngr::get_local_dir(path);
+            value = FileMngr::get_local_dir(file_path, dir_path);
 
         if (!value.empty())
-            asio::co_spawn(context, set_memcached_object_async(path, value, 0, 0), asio::detached);
+            asio::co_spawn(context, set_memcached_object_async(file_path, value, 0, 0), asio::detached);
 
         response.rescode = ResultCode::to_byte(ResultCode::Type::SUCCESS);
         response.value_len = value.length();
@@ -378,33 +303,19 @@ void CacheConnectionHandler::get(const CachePacket& request, CachePacket& respon
 
 }
 
-
-// void CacheConnectionHandler::remove_local_file(const std::string& path) const
-// {
-//     int res = unlink(path.c_str());
-//     if (res != 0)
-//         throw std::runtime_error(std::format("remove_local_dir: {}", std::strerror(errno)));
-// }
-
-// void CacheConnectionHandler::remove_local_dir(const std::string& path) const
-// {
-//     int res = rmdir(path.c_str());
-//     if (res != 0)
-//         throw std::runtime_error(std::format("remove_local_dir: {}", std::strerror(errno)));
-// }
-
 void CacheConnectionHandler::remove(const CachePacket& request, CachePacket& response, bool is_file)
 {
     try {
         std::string path = Utils::get_string_from_byte_array(request.key);
-        Utils::process_path(path, storage_dir);
+        std::string file_path = Utils::process_path(path, file_metadata_dir);
+        std::string dir_path = Utils::process_path(path, dir_metadata_dir);
 
         if (is_file)
-            FileMngr::remove_local_file(path);
+            FileMngr::remove_local_file(file_path);
         else
-            FileMngr::remove_local_dir(path);
+            FileMngr::remove_local_dir(file_path, dir_path);
 
-        asio::co_spawn(context, remove_memcached_object_async(path), asio::detached);
+        asio::co_spawn(context, remove_memcached_object_async(file_path), asio::detached);
 
         response.rescode = ResultCode::to_byte(ResultCode::Type::SUCCESS);
     }
@@ -419,52 +330,18 @@ void CacheConnectionHandler::remove(const CachePacket& request, CachePacket& res
 
 }
 
-// void CacheConnectionHandler::update_local_file(const std::string& path, const UpdateCommand& command) const
-// {
-//     try {
-//         Stat file_proto;
-//         std::string file_content = get_local_file(path);
-//         file_proto.ParseFromString(file_content);
-
-//         switch (UpdateCode::from_byte(command.opcode))
-//         {
-//             case UpdateCode::Type::CHMOD:
-//                 chmod_file(path, file_proto, command.argv);
-//                 break;
-//             case UpdateCode::Type::CHOWN:
-//                 chown_file(path, file_proto, command.argv);
-//                 break;
-//             case UpdateCode::Type::RENAME:
-//                 rename_file(path, file_proto, command.argv);
-//                 break;
-//             default:
-//                 throw std::runtime_error("Unknown update command.");
-//         }
-//     }
-//     catch (std::exception& e)
-//     {
-//         throw std::runtime_error(std::format("update_local_file: {}", e.what()));
-//     }
-// }
-
-// void CacheConnectionHandler::update_local_dir(const std::string& path, const UpdateCommand& command) const
-// {
-//     int res = rmdir(path.c_str());
-//     if (res != 0)
-//         throw std::runtime_error(std::format("remove_local_dir: {}", std::strerror(errno)));
-// }
-
 void CacheConnectionHandler::update(const CachePacket& request, CachePacket& response, bool is_file) 
 {
     try {
         std::string path = Utils::get_string_from_byte_array(request.key);
-        Utils::process_path(path, storage_dir);
+        std::string file_path = Utils::process_path(path, file_metadata_dir);
+        std::string dir_path = Utils::process_path(path, dir_metadata_dir);
         UpdateCommand command = UpdateCommand(request.value.data(), request.value.size());
 
         if (is_file)
-            FileMngr::update_local_file(path, command);
+            FileMngr::update_local_file(file_path, command);
         else
-            FileMngr::update_local_dir(path, command);
+            FileMngr::update_local_dir(file_path, dir_path, command);
 
         // asio::co_spawn(context, remove_memcached_object_async(path), asio::detached);
 

@@ -30,7 +30,7 @@ namespace OperationCode {
         SET_DIR = 5,
         RM_FILE = 6,
         RM_DIR = 7,
-        CH_FILE = 8, // change commands
+        CH_FILE = 8, // change commands (update)
         CH_DIR = 9,
     };
 

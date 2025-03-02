@@ -31,7 +31,7 @@ namespace Utils
     void proto_to_struct_stat(const Stat& proto_stat, struct stat* object_stat); 
     std::vector<std::string> get_dir_list(const Stat& proto_stat);
     void set_dir_list(Stat& proto_stat, const std::vector<std::string>& dir_list);
-    void process_path(std::string& path, const std::string& absolute_path);
+    std::string process_path(std::string path, const std::string& absolute_path);
     std::string get_parent_dir(std::string path);
 
     std::vector<uint8_t> get_byte_array_from_int(uint32_t value);

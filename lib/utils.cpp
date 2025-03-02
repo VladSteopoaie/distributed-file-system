@@ -116,12 +116,13 @@ void Utils::set_dir_list(Stat& proto_stat, const std::vector<std::string>& dir_l
         proto_stat.add_dir_list(path);
 }
 
-void Utils::process_path(std::string& path, const std::string& absolute_path) {
+std::string Utils::process_path(std::string path, const std::string& absolute_path) {
     if (!path.empty() && path[0] == '/') {
         path = path.substr(1);
     }
 
     path = absolute_path + path;
+    return path;
 }
 
 std::string Utils::get_parent_dir(std::string path) {

@@ -19,9 +19,10 @@ namespace CacheAPI {
         tcp::socket socket;
         memcached_st* mem_client;
         uint16_t mem_port;
-        // const size_t max_buf_size;
         std::vector<uint8_t> buffer; // buffer to store incoming data
-        std::string storage_dir;
+        // directories paths to store metadata files
+        std::string file_metadata_dir;
+        std::string dir_metadata_dir;
 
         void handle_error(std::string error);
         void handle_request(const CachePacket& request, CachePacket& response);
@@ -57,7 +58,14 @@ namespace CacheAPI {
         void update(const CachePacket& request, CachePacket& response, bool is_file);
 
     public:
-        CacheConnectionHandler(asio::io_context& context, memcached_st* mem_client, uint16_t mem_port, std::string storage_dir);
+        CacheConnectionHandler(
+            asio::io_context& context, 
+            memcached_st* mem_client, 
+            uint16_t mem_port, 
+            std::string file_metadata_dir,
+            std::string dir_metadata_dir
+        );
+        
         ~CacheConnectionHandler();
 
         tcp::socket& get_socket();

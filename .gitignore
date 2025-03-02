@@ -1,3 +1,5 @@
 objects
 bin
-storage
+file_metadata
+dir_metadata
+TODO
