@@ -10,7 +10,7 @@ namespace CacheAPI {
         // memcached stuff
         memcached_st* mem_client;
         std::string mem_conf_string;
-        std::string storage_dir;
+        std::string file_metadata_dir, dir_metadata_dir;
         uint16_t mem_port;
         pid_t memcached_pid;
 
@@ -18,10 +18,10 @@ namespace CacheAPI {
         CacheServer(const CacheServer&) = delete;
         CacheServer& operator= (const CacheServer&) = delete;
         
-        CacheServer(int thread_count, std::string mem_conf_string, std::string storage_dir);
-        CacheServer(int thread_count, uint16_t mem_port, std::string storage_dir);
-        CacheServer(int thread_count, std::string storage_dir);
-        CacheServer(std::string storage_dir);
+        CacheServer(int thread_count, std::string mem_conf_string, std::string file_metadata_dir, std::string dir_metadata_dir);
+        CacheServer(int thread_count, uint16_t mem_port, std::string file_metadata_dir, std::string dir_metadata_dir);
+        CacheServer(int thread_count, std::string file_metadata_dir, std::string dir_metadata_dir);
+        CacheServer(std::string file_metadata_dir, std::string dir_metadata_dir);
         ~CacheServer();
 
         void run(uint16_t port);

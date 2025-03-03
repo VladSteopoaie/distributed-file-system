@@ -10,7 +10,7 @@ namespace FileMngr {
     void set_local_dir(const std::string& path, const std::string& meta_path, mode_t mode);
     
     std::string get_local_file(const std::string& path);
-    std::string get_local_dir(const std::string& path, const std::string& meta_path, bool update_dir_list);
+    std::string get_local_dir(const std::string& path, const std::string& meta_path, bool update_dir_list=false);
 
     int rmdir_recursive(const char* path);
     void remove_local_file(const std::string& path);

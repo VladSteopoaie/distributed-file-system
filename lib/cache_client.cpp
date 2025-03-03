@@ -211,6 +211,7 @@ std::string CacheClient::get(std::string key, bool is_file)
 asio::awaitable<int> CacheClient::remove_async(std::string key, bool is_file)
 {
     try {
+        // std::cout << "Remove " << key << " " << (is_file ? "file" : "dir") << std::endl;
         CachePacket request, response;
         request.id = Utils::generate_id();
         if (is_file)

@@ -117,8 +117,8 @@ void Utils::set_dir_list(Stat& proto_stat, const std::vector<std::string>& dir_l
 }
 
 std::string Utils::process_path(std::string path, const std::string& absolute_path) {
-    if (!path.empty() && path[0] == '/') {
-        path = path.substr(1);
+    if (path.length() == 1 && path[0] == '.') {
+        path = "/";
     }
 
     path = absolute_path + path;
@@ -126,13 +126,13 @@ std::string Utils::process_path(std::string path, const std::string& absolute_pa
 }
 
 std::string Utils::get_parent_dir(std::string path) {
-    if (path.empty() || path == ".")
+    if (path.empty() || path == "/")
         return "..";
 
     size_t last_slash = path.find_last_of('/');
 
     if (last_slash == std::string::npos || path.substr(0, last_slash).empty())
-        return ".";
+        return "/";
 
     return path.substr(0, last_slash);
 }

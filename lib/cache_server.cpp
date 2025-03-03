@@ -4,25 +4,26 @@ using namespace CacheAPI;
 
 template class GenericServer<CacheConnectionHandler>;
 
-CacheServer::CacheServer(int thread_count, std::string mem_conf_string, std::string storage_dir)
+CacheServer::CacheServer(int thread_count, std::string mem_conf_string, std::string file_metadata_dir, std::string dir_metadata_dir)
     : GenericServer<CacheConnectionHandler>::GenericServer(thread_count)
     , mem_conf_string(mem_conf_string)
     , memcached_pid(-1)
     , mem_port(0)
-    , storage_dir(storage_dir)
+    , file_metadata_dir(file_metadata_dir)
+    , dir_metadata_dir(dir_metadata_dir)
 {
     try {
-        if (!std::filesystem::exists(storage_dir))
+        if (!std::filesystem::exists(file_metadata_dir))
         {
-            throw std::runtime_error(std::format("No directory {} found.", storage_dir));
+            throw std::runtime_error(std::format("No directory {} found.", file_metadata_dir));
         }
-        else if (!std::filesystem::is_directory(storage_dir))
+        else if (!std::filesystem::is_directory(file_metadata_dir))
         {
-            throw std::runtime_error(std::format("{} it's not a directory.", storage_dir));   
+            throw std::runtime_error(std::format("{} it's not a directory.", file_metadata_dir));   
         } 
 
-        if (storage_dir[storage_dir.length() - 1] != '/')
-            this->storage_dir = storage_dir + "/";
+        if (file_metadata_dir[file_metadata_dir.length() - 1] != '/')
+            this->file_metadata_dir = file_metadata_dir + "/";
 
         ////// MEMCACHED CONNECTION //////
         if (mem_conf_string.length() == 0)
@@ -46,23 +47,26 @@ CacheServer::CacheServer(int thread_count, std::string mem_conf_string, std::str
     }
 }
 
-CacheServer::CacheServer(int thread_count, uint16_t mem_port, std::string storage_dir) 
+CacheServer::CacheServer(int thread_count, uint16_t mem_port,std::string file_metadata_dir, std::string dir_metadata_dir)
     : GenericServer<CacheConnectionHandler>::GenericServer(thread_count)
     , mem_port(mem_port)
     , mem_conf_string(std::format("--SERVER=127.0.0.1:{}", mem_port))
-    , storage_dir(storage_dir)
+    , file_metadata_dir(file_metadata_dir)
+    , dir_metadata_dir(dir_metadata_dir)
 {
-    if (!std::filesystem::exists(storage_dir))
+    if (!std::filesystem::exists(file_metadata_dir) || !std::filesystem::exists(dir_metadata_dir))
     {
-        throw std::runtime_error(std::format("No directory {} found.", storage_dir));
+        throw std::runtime_error(std::format("No directory {} or {} found.", file_metadata_dir, dir_metadata_dir));
     }
-    else if (!std::filesystem::is_directory(storage_dir))
+    else if (!std::filesystem::is_directory(file_metadata_dir))
     {
-        throw std::runtime_error(std::format("{} it's not a directory.", storage_dir));   
+        throw std::runtime_error(std::format("{} or {} it's not a directory.", file_metadata_dir, dir_metadata_dir));   
     }
 
-    if (storage_dir[storage_dir.length() - 1] != '/')
-        this->storage_dir += "/";
+    if (file_metadata_dir[file_metadata_dir.length() - 1] != '/')
+        this->file_metadata_dir += "/";
+    if (dir_metadata_dir[dir_metadata_dir.length() - 1] != '/')
+        this->dir_metadata_dir += "/";
 
     // starting a memcached server
     SPDLOG_INFO("CacheServer: Starting memcached server on 0.0.0.0:{}.", mem_port);
@@ -98,12 +102,12 @@ CacheServer::CacheServer(int thread_count, uint16_t mem_port, std::string storag
     }
 }
 
-CacheServer::CacheServer(int thread_count, std::string storage_dir)
-    : CacheServer(thread_count, 11211, storage_dir) // default memcached port -> 11211
+CacheServer::CacheServer(int thread_count, std::string file_metadata_dir, std::string dir_metadata_dir)
+    : CacheServer(thread_count, 11211, file_metadata_dir, dir_metadata_dir) // default memcached port -> 11211
 {}
 
-CacheServer::CacheServer(std::string storage_dir)
-    : CacheServer(1, storage_dir) // default mode -> 1 thread
+CacheServer::CacheServer(std::string file_metadata_dir, std::string dir_metadata_dir)
+    : CacheServer(1, file_metadata_dir, dir_metadata_dir) // default mode -> 1 thread
 {}
 
 CacheServer::~CacheServer()
@@ -119,5 +123,5 @@ CacheServer::~CacheServer()
 }
 
 void CacheServer::run(uint16_t port) {
-    GenericServer<CacheConnectionHandler>::run(port, mem_client, mem_port, storage_dir);
+    GenericServer<CacheConnectionHandler>::run(port, mem_client, mem_port, file_metadata_dir, dir_metadata_dir);
 }

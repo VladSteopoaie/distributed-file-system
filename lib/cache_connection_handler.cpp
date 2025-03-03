@@ -10,9 +10,7 @@ CacheConnectionHandler::CacheConnectionHandler(asio::io_context& context, memcac
     , mem_port(mem_port)
     , file_metadata_dir(file_metadata_dir)
     , dir_metadata_dir(dir_metadata_dir)
-{
-    // TODO: check if directories exist, and ensure they have / at the end
-}
+{}
 
 CacheConnectionHandler::~CacheConnectionHandler() {
     socket.close();
@@ -87,8 +85,17 @@ void CacheConnectionHandler::handle_request(const CachePacket& request, CachePac
 
 }
 
+void CacheConnectionHandler::update_parent_dir(const std::string& path)
+{
+    std::string parent_path = Utils::get_parent_dir(path);
+    std::string parent_value = FileMngr::get_local_dir(file_metadata_dir + parent_path, dir_metadata_dir + parent_path, true);
+    asio::co_spawn(context, set_memcached_object_async(parent_path, parent_value, 0, 0), asio::detached);
+}
+
 void CacheConnectionHandler::set_memcached_object(std::string key, std::string value, time_t expiration, uint32_t flags)
 {
+    // std::cout << key.length() << " -> " << key << std::endl;
+    // std::cout << value.length() << " -> " << value << std::endl;
     memcached_return_t result = memcached_set(mem_client, 
             key.c_str(), key.size(), 
             value.c_str(), value.size(),
@@ -245,21 +252,18 @@ void CacheConnectionHandler::set(const CachePacket& request, CachePacket& respon
         {
             // creating two directories
             // 1. for the folder hierarchy of the file system
-            FileMngr::set_local_dir(file_path, mode);
+            // FileMngr::set_local_dir(file_path, mode);
             // 2. for storing the metadata about the directory (the file with metadata will be stored in .this file)
             // inside the directory
             FileMngr::set_local_dir(file_path, dir_path, mode);
-            value = FileMngr::get_local_dir(file_path, dir_path);
+            value = FileMngr::get_local_dir(file_path, dir_path, true);
         }
 
-        asio::co_spawn(context, set_memcached_object_async(file_path, value, time, flags), asio::detached);
+        asio::co_spawn(context, set_memcached_object_async(path, value, time, flags), asio::detached);
         
         // when creating an object we need to update the parent directory in 
         // the memcached server
-        std::string parent_path = Utils::get_parent_dir(path);
-        std::string parent_value = FileMngr::get_local_dir(file_metadata_dir + parent_path, dir_metadata_dir + parent_path, true);
-        asio::co_spawn(context, set_memcached_object_async(file_metadata_dir + parent_path, parent_value, time, flags), asio::detached);
-
+        update_parent_dir(path);
         response.rescode = ResultCode::to_byte(ResultCode::Type::SUCCESS);
     }
     catch (std::exception& e)
@@ -285,8 +289,10 @@ void CacheConnectionHandler::get(const CachePacket& request, CachePacket& respon
         else
             value = FileMngr::get_local_dir(file_path, dir_path);
 
+        // std::cout << "value: " << value.length() << " -> " << value << std::endl;
+
         if (!value.empty())
-            asio::co_spawn(context, set_memcached_object_async(file_path, value, 0, 0), asio::detached);
+            asio::co_spawn(context, set_memcached_object_async(path, value, 0, 0), asio::detached);
 
         response.rescode = ResultCode::to_byte(ResultCode::Type::SUCCESS);
         response.value_len = value.length();
@@ -315,8 +321,8 @@ void CacheConnectionHandler::remove(const CachePacket& request, CachePacket& res
         else
             FileMngr::remove_local_dir(file_path, dir_path);
 
-        asio::co_spawn(context, remove_memcached_object_async(file_path), asio::detached);
-
+        asio::co_spawn(context, remove_memcached_object_async(path), asio::detached);
+        update_parent_dir(path);    
         response.rescode = ResultCode::to_byte(ResultCode::Type::SUCCESS);
     }
     catch (std::exception& e)

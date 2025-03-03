@@ -27,11 +27,13 @@ namespace CacheAPI {
         void handle_error(std::string error);
         void handle_request(const CachePacket& request, CachePacket& response);
 
+        void update_parent_dir(const std::string& path);
         // memcached related 
         void set_memcached_object(std::string key, std::string value, time_t expiration, uint32_t flags);
         void set_memcached_object(std::string key, std::string value);
         asio::awaitable<void> set_memcached_object_async(std::string key, std::string value, time_t expiration, uint32_t flags);
-        
+
+
         std::string get_memcached_object(std::string key);
 
         void remove_memcached_object(std::string key);

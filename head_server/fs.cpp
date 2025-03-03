@@ -77,17 +77,17 @@ static int myfs_rmdir(const char *path)
 
 static int myfs_rename(const char *old_path, const char *new_path, unsigned int flags)
 {
-
+	return 0;
 }
 
 static int myfs_chmod(const char *path, mode_t mode, struct fuse_file_info *file_info)
 {
-
+	return 0;
 }
 
 static int myfs_chown(const char *path, uid_t uid, gid_t gid, struct fuse_file_info *file_info)
 {
-	
+	return 0;
 }
 
 static int myfs_open(const char *path, struct fuse_file_info *file_info)
@@ -181,7 +181,7 @@ static int myfs_create(const char *path, mode_t mode, struct fuse_file_info *fil
 static int myfs_utimens(const char *path, const struct timespec tv[2], struct fuse_file_info *file_info)
 {
 	(void) path;
-	(void) rv;
+	(void) tv;
 	(void) file_info;
 	return 0;
 }
@@ -200,7 +200,7 @@ static const struct fuse_operations myfs_oper = {
 	.release	= myfs_release,
 	.opendir	= myfs_opendir,
 	.readdir	= myfs_readdir,
-	.releasedir = myfs_releasedir
+	.releasedir = myfs_releasedir,
 	.init       = myfs_init,
 	.create 	= myfs_create,
 	.utimens	= myfs_utimens,
@@ -211,7 +211,8 @@ int main(int argc, char** argv)
 	int ret;
 	HostInfo host_info;
 	struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
-
+	spdlog::set_level(spdlog::level::debug); // Set global log level to debug
+	spdlog::set_pattern("(%s:%#) [%^%l%$] %v");
 	// Parse command-line arguments
     for (int i = 0; i < argc; ++i) {
         if (strcmp(argv[i], "--address") == 0 && i + 1 < argc) {

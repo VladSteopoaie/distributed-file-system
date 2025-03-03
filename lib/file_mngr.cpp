@@ -62,30 +62,32 @@ std::string FileMngr::get_local_file(const std::string& file_path)
     return buf.str();
 }
 
-std::string FileMngr::get_local_dir(const std::string& path, const std::string& meta_path, bool update_dir_list=false)
+std::string FileMngr::get_local_dir(const std::string& path, const std::string& meta_path, bool update_dir_list)
 {
     SPDLOG_DEBUG(std::format("Path file: {}", path));
     SPDLOG_DEBUG(std::format("Path dir: {}", meta_path));
+    std::string meta_dir_file = meta_path + "/.this";
+    std::string result;
     if (update_dir_list == false)
     {
-        std::ifstream i_file(meta_path + "/.this"); // looking for metadat in .this
+        std::ifstream i_file(meta_dir_file); // looking for metadat in .this
         if (i_file)
         {
-            i_file >> result;
+            result = std::string((std::istreambuf_iterator<char>(i_file)), std::istreambuf_iterator<char>());
             i_file.close();
             return result;
         }
     }
 
+    // if we are doing an update we have to make sure that no previous data remains
+    // this is in case there is an error before writing to .this
+    unlink(meta_dir_file.c_str());
+
     Stat dir_proto;
     struct stat dir_stat;
     struct dirent* entry;
-    std::string result;
     std::ofstream o_file;
 
-    o_file.open(meta_path + "/.this");
-    if (!o_file.is_open())
-        throw std::runtime_error(std::format("get_local_dir: {}", std::strerror(errno)));
 
     DIR* dir = opendir(path.c_str());
 
@@ -97,6 +99,7 @@ std::string FileMngr::get_local_dir(const std::string& path, const std::string& 
 
     Utils::struct_stat_to_proto(&dir_stat, dir_proto);
 
+    errno = 0; // does not work without this line \('_')/
     while ((entry = readdir(dir)) != nullptr)
         dir_proto.add_dir_list(entry->d_name);
 
@@ -106,9 +109,16 @@ std::string FileMngr::get_local_dir(const std::string& path, const std::string& 
 
     dir_proto.SerializeToString(&result);
 
+
+    o_file.open(meta_dir_file);
+    if (!o_file.is_open())
+       SPDLOG_ERROR(std::format("get_local_dir: {}", std::strerror(errno)));
+    
     o_file << result;
     o_file.close();
 
+    // std::cout << "result: " << result << std::endl;
+    // std::cout << "result: " << result.length() << " -> " << result << std::endl;
     return result;
 }
 
@@ -152,7 +162,7 @@ void FileMngr::remove_local_file(const std::string& path)
 void FileMngr::remove_local_dir(const std::string& path, const std::string& meta_path)
 {
 
-    int res = rmdir_recursive(path.c_str());
+    int res = rmdir(path.c_str());
     if (res != 0)
         throw std::runtime_error(std::format("remove_local_dir: {}", std::strerror(errno)));
     res = rmdir_recursive(meta_path.c_str());
@@ -181,6 +191,8 @@ std::string FileMngr::update_local_file(const std::string& path, const UpdateCom
             default:
                 throw std::runtime_error("Unknown update command.");
         }
+
+        return "";
     }
     catch (std::exception& e)
     {
@@ -188,9 +200,10 @@ std::string FileMngr::update_local_file(const std::string& path, const UpdateCom
     }
 }
 
-std::string FileMngr::update_local_dir(const std::string& path, const UpdateCommand& command)
+std::string FileMngr::update_local_dir(const std::string& path, const std::string& meta_path, const UpdateCommand& command)
 {
     int res = rmdir(path.c_str());
     if (res != 0)
         throw std::runtime_error(std::format("remove_local_dir: {}", std::strerror(errno)));
+    return "";
 }
