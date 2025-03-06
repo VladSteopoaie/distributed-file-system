@@ -28,11 +28,6 @@ void CacheConnectionHandler::start()
 }
 
 // private
-void CacheConnectionHandler::handle_error(std::string error)
-{
-    SPDLOG_ERROR(error);
-}
-
 void CacheConnectionHandler::handle_request(const CachePacket& request, CachePacket& response)
 {
     if (request.id == 0)
@@ -71,11 +66,8 @@ void CacheConnectionHandler::handle_request(const CachePacket& request, CachePac
         case OperationCode::Type::RM_DIR:
             remove(request, response, false);
             break;
-        case OperationCode::Type::CH_FILE:
-            update(request, response, true);
-            break;
-        case OperationCode::Type::CH_DIR:
-            update(request, response, false);
+        case OperationCode::Type::UPDATE:
+            update(request, response);
             break;
         
         default:
@@ -87,15 +79,49 @@ void CacheConnectionHandler::handle_request(const CachePacket& request, CachePac
 
 void CacheConnectionHandler::update_parent_dir(const std::string& path)
 {
-    std::string parent_path = Utils::get_parent_dir(path);
-    std::string parent_value = FileMngr::get_local_dir(file_metadata_dir + parent_path, dir_metadata_dir + parent_path, true);
-    asio::co_spawn(context, set_memcached_object_async(parent_path, parent_value, 0, 0), asio::detached);
+    try 
+    {
+        std::string parent_path = Utils::get_parent_dir(path);
+        std::string parent_value = FileMngr::get_local_dir(file_metadata_dir + parent_path, dir_metadata_dir + parent_path, true);
+        asio::co_spawn(context, set_memcached_object_async(parent_path, parent_value, 0, 0), asio::detached);
+    }
+    catch (std::exception& e)
+    {
+        throw std::runtime_error(std::format("update_parent_dir: {}", e.what()));
+    }
 }
 
-void CacheConnectionHandler::set_memcached_object(std::string key, std::string value, time_t expiration, uint32_t flags)
+void CacheConnectionHandler::update_memcached_object(const std::string& key, const std::string& value, time_t expiration, uint32_t flags)
 {
-    // std::cout << key.length() << " -> " << key << std::endl;
-    // std::cout << value.length() << " -> " << value << std::endl;
+    memcached_return_t result = memcached_replace(mem_client,
+    key.c_str(), key.length(),
+    value.c_str(), value.length(),
+    expiration, flags);
+
+    if (result != MEMCACHED_SUCCESS)
+    {
+        throw std::runtime_error(std::format("update_memcached_object: {}", memcached_strerror(mem_client, result)));
+    }
+}
+
+asio::awaitable<void> CacheConnectionHandler::update_memcached_object_async(const std::string& key, const std::string& value, time_t expiration, uint32_t flags)
+{
+    try {
+        update_memcached_object(key, value, expiration, flags);
+    }
+    catch (std::exception& e)
+    {
+        SPDLOG_ERROR(std::format("update_memcached_object_async: {}", e.what()));
+    }
+
+    co_return;
+}
+
+void CacheConnectionHandler::set_memcached_object(const std::string& key, const std::string& value, time_t expiration, uint32_t flags)
+{
+    std::cout << "SET:" << std::endl;
+    std::cout << key.length() << " -> " << key << std::endl;
+    std::cout << value.length() << " -> " << value << std::endl;
     memcached_return_t result = memcached_set(mem_client, 
             key.c_str(), key.size(), 
             value.c_str(), value.size(),
@@ -107,7 +133,7 @@ void CacheConnectionHandler::set_memcached_object(std::string key, std::string v
     }
 }
 
-void CacheConnectionHandler::set_memcached_object(std::string key, std::string value)
+void CacheConnectionHandler::set_memcached_object(const std::string& key, const std::string& value)
 {
     try {
         set_memcached_object(key, value, 0, 0);
@@ -118,7 +144,7 @@ void CacheConnectionHandler::set_memcached_object(std::string key, std::string v
     }
 }
 
-asio::awaitable<void> CacheConnectionHandler::set_memcached_object_async(std::string key, std::string value, time_t expiration, uint32_t flags)
+asio::awaitable<void> CacheConnectionHandler::set_memcached_object_async(const std::string& key, const std::string& value, time_t expiration, uint32_t flags)
 {
     try {
         set_memcached_object(key, value, expiration, flags);
@@ -131,7 +157,7 @@ asio::awaitable<void> CacheConnectionHandler::set_memcached_object_async(std::st
     co_return;
 }
 
-std::string CacheConnectionHandler::get_memcached_object(std::string key)
+std::string CacheConnectionHandler::get_memcached_object(const std::string& key)
 {
     memcached_return_t error;
     char* result = memcached_get(mem_client, key.c_str(), key.length(), NULL, NULL, &error);
@@ -145,7 +171,7 @@ std::string CacheConnectionHandler::get_memcached_object(std::string key)
 }
 
 
-void CacheConnectionHandler::remove_memcached_object(std::string key) 
+void CacheConnectionHandler::remove_memcached_object(const std::string& key) 
 {
     memcached_return_t result;
     result = memcached_delete(mem_client, key.c_str(), key.length(), 0);
@@ -156,7 +182,7 @@ void CacheConnectionHandler::remove_memcached_object(std::string key)
     }
 }
 
-asio::awaitable<void> CacheConnectionHandler::remove_memcached_object_async(std::string key) 
+asio::awaitable<void> CacheConnectionHandler::remove_memcached_object_async(const std::string& key) 
 {
     try {
         remove_memcached_object(key);
@@ -193,7 +219,7 @@ void CacheConnectionHandler::read_socket_async()
             }
             catch (std::exception& e)
             {
-                self->handle_error(std::format("read_socket_async: {}", e.what()));
+                SPDLOG_ERROR(std::format("read_socket_async: {}", e.what()));
             }
 
         });
@@ -208,7 +234,7 @@ void CacheConnectionHandler::write_socket_async()
         {
             if (error)
             {
-                self->handle_error(std::format("write_socket_async: {}", error.message()));
+                SPDLOG_ERROR(std::format("write_socket_async: {}", error.message()));
                 return;
             }
 
@@ -336,20 +362,50 @@ void CacheConnectionHandler::remove(const CachePacket& request, CachePacket& res
 
 }
 
-void CacheConnectionHandler::update(const CachePacket& request, CachePacket& response, bool is_file) 
+void CacheConnectionHandler::update(const CachePacket& request, CachePacket& response) 
 {
     try {
+        bool is_file;
         std::string path = Utils::get_string_from_byte_array(request.key);
         std::string file_path = Utils::process_path(path, file_metadata_dir);
         std::string dir_path = Utils::process_path(path, dir_metadata_dir);
+        std::string value, rename_content;
+        std::cout << request.to_string() << std::endl;
         UpdateCommand command = UpdateCommand(request.value.data(), request.value.size());
+        std::cout << command.to_string() << std::endl;
+        if (std::filesystem::is_regular_file(file_path))
+            is_file = true;
+        else if (std::filesystem::is_directory(file_path))
+            is_file = false;
+        else
+        {
+            errno = ENOENT;
+            throw std::runtime_error(std::strerror(errno));
+        }
+
+        if (UpdateCode::from_byte(command.opcode) == UpdateCode::RENAME)
+        {
+            if (is_file)
+                rename_content = FileMngr::get_local_file(file_path);
+            else
+                rename_content = FileMngr::get_local_dir(file_path, dir_path);
+        }
 
         if (is_file)
-            FileMngr::update_local_file(file_path, command);
+            value = FileMngr::update_local_file(path, file_metadata_dir, command);
         else
-            FileMngr::update_local_dir(file_path, dir_path, command);
+            value = FileMngr::update_local_dir(path, file_metadata_dir, dir_metadata_dir, command);
 
-        // asio::co_spawn(context, remove_memcached_object_async(path), asio::detached);
+        if (UpdateCode::from_byte(command.opcode) == UpdateCode::RENAME)
+        {
+            asio::co_spawn(context, remove_memcached_object_async(path), asio::detached);
+            asio::co_spawn(context, set_memcached_object_async(value, rename_content, 0, 0), asio::detached);
+            update_parent_dir(path);
+        }
+        else
+        {
+            asio::co_spawn(context, update_memcached_object_async(path, value, 0, 0), asio::detached);
+        }
 
         response.rescode = ResultCode::to_byte(ResultCode::Type::SUCCESS);
     }

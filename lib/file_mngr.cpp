@@ -49,10 +49,11 @@ void FileMngr::set_local_dir(const std::string& path, const std::string& meta_pa
 }
 
 
-std::string FileMngr::get_local_file(const std::string& file_path)
+std::string FileMngr::get_local_file(const std::string& path)
 {
-    SPDLOG_DEBUG(std::format("Path: {}", file_path));
-    std::ifstream file(file_path);
+    std::cout << "Path file: " << path << std::endl;
+    SPDLOG_DEBUG(std::format("Path: {}", path));
+    std::ifstream file(path);
 
     if (!file)
         throw std::runtime_error(std::format("get_local_file: {}", std::strerror(errno)));
@@ -64,6 +65,7 @@ std::string FileMngr::get_local_file(const std::string& file_path)
 
 std::string FileMngr::get_local_dir(const std::string& path, const std::string& meta_path, bool update_dir_list)
 {
+    std::cout << "Path dir: " << path << std::endl;
     SPDLOG_DEBUG(std::format("Path file: {}", path));
     SPDLOG_DEBUG(std::format("Path dir: {}", meta_path));
     std::string meta_dir_file = meta_path + "/.this";
@@ -170,29 +172,102 @@ void FileMngr::remove_local_dir(const std::string& path, const std::string& meta
         throw std::runtime_error(std::format("remove_local_dir: {}", std::strerror(errno)));
 }
 
-std::string FileMngr::update_local_file(const std::string& path, const UpdateCommand& command)
+std::string FileMngr::chmod_object(const std::string& path, const std::vector<std::vector<uint8_t>>& argv)
+{
+    try 
+    {
+        std::string content = get_local_file(path);
+
+        Stat proto;
+        proto.ParseFromString(content);
+        mode_t new_mode = Utils::get_int_from_byte_array(argv[0]);
+        proto.set_mode(new_mode);
+        proto.SerializeToString(&content);
+
+        std::ofstream o_file(path);
+        if (o_file.is_open())
+            o_file << content;
+        else
+            throw std::runtime_error(std::strerror(errno));
+        
+        return content;
+    }
+    catch (std::exception& e)
+    {   
+        throw std::runtime_error(std::format("chmod_object: {}", e.what()));
+    }
+}
+
+std::string FileMngr::chown_object(const std::string& path, const std::vector<std::vector<uint8_t>>& argv)
+{
+    try 
+    {
+        std::string content = get_local_file(path);
+
+        Stat proto;
+        proto.ParseFromString(content);
+        uid_t new_uid = Utils::get_int_from_byte_array(argv[0]);
+        gid_t new_gid = Utils::get_int_from_byte_array(argv[1]);
+        proto.set_uid(new_uid);
+        proto.set_gid(new_gid);
+        proto.SerializeToString(&content);
+
+        std::ofstream o_file(path);
+        if (o_file.is_open())
+            o_file << content;
+        else
+            throw std::runtime_error(std::strerror(errno));
+        
+        return content;
+    }
+    catch (std::exception& e)
+    {   
+        throw std::runtime_error(std::format("chmod_object: {}", e.what()));
+    }
+
+}
+
+std::string FileMngr::rename_object(const std::string& path, const std::string& meta_dir, const std::vector<std::vector<uint8_t>>& argv)
+{
+    std::string new_path = meta_dir + Utils::get_string_from_byte_array(argv[0]);
+    std::string old_path = meta_dir + path;
+    int res = rename(old_path.c_str(), new_path.c_str());
+    if (res != 0)
+        throw std::runtime_error(std::format("rename_object: {}", std::strerror(errno)));
+    return Utils::get_string_from_byte_array(argv[0]);
+}
+
+std::string FileMngr::update_local_object(const std::string& path, const std::string& file_metadata_dir, const std::string& dir_metadata_dir, const UpdateCommand& command, bool is_file)
 {
     try {
-        Stat file_proto;
-        std::string file_content = get_local_file(path);
-        file_proto.ParseFromString(file_content);
-
+        std::string file_meta = file_metadata_dir + path;
+        std::string dir_meta = dir_metadata_dir + path;
+        std::string content;
+        std::cout << command.to_string() << std::endl;
         switch (UpdateCode::from_byte(command.opcode))
         {
             case UpdateCode::Type::CHMOD:
-                // chmod_file(path, file_proto, command.argv);
+                if (is_file)
+                    content = chmod_object(file_meta, command.argv);
+                else 
+                    content = chmod_object(dir_meta + "/.this", command.argv);
                 break;
             case UpdateCode::Type::CHOWN:
-                // chown_file(path, file_proto, command.argv);
+                if (is_file)
+                    content = chown_object(file_meta, command.argv);
+                else 
+                    content = chown_object(dir_meta + "/.this", command.argv);
                 break;
             case UpdateCode::Type::RENAME:
-                // rename_file(path, file_proto, command.argv);
+                content = rename_object(path, file_metadata_dir, command.argv);
+                if (!is_file)
+                    rename_object(path, dir_metadata_dir, command.argv);    
                 break;
             default:
                 throw std::runtime_error("Unknown update command.");
         }
 
-        return "";
+        return content;
     }
     catch (std::exception& e)
     {
@@ -200,10 +275,27 @@ std::string FileMngr::update_local_file(const std::string& path, const UpdateCom
     }
 }
 
-std::string FileMngr::update_local_dir(const std::string& path, const std::string& meta_path, const UpdateCommand& command)
+
+std::string FileMngr::update_local_file(const std::string& path, const std::string& file_metadata_dir, const UpdateCommand& command)
 {
-    int res = rmdir(path.c_str());
-    if (res != 0)
-        throw std::runtime_error(std::format("remove_local_dir: {}", std::strerror(errno)));
-    return "";
+    try 
+    {
+        return update_local_object(path, file_metadata_dir, "", command, true);
+    }
+    catch (std::exception& e)
+    {
+        throw std::runtime_error(e.what());
+    }
+}
+
+std::string FileMngr::update_local_dir(const std::string& path, const std::string& file_metadata_dir, const std::string& dir_metadata_dir, const UpdateCommand& command)
+{
+    try 
+    {
+        return update_local_object(path, file_metadata_dir, dir_metadata_dir, command, false);
+    }
+    catch (std::exception& e)
+    {
+        throw std::runtime_error(e.what());
+    }
 }

@@ -24,35 +24,40 @@ namespace CacheAPI {
 
         asio::awaitable<void> send_request_async(const CachePacket& request);
         asio::awaitable<void> receive_response_async(CachePacket& response);
-        std::string get_memcached_object(std::string key); 
+        std::string get_memcached_object(const std::string& key); 
 
-        asio::awaitable<int> set_async(std::string key, std::string value, uint32_t time, uint8_t flags, bool is_file);
-        int set(std::string key, std::string value, uint32_t time, uint8_t flags, bool is_file);
-        int set(std::string key, std::string value, bool is_file);
-        // asio::awaitable<void> set_async(std::string key, std::string value);
+        asio::awaitable<int> set_async(const std::string& key, const std::string& value, uint32_t time, uint8_t flags, bool is_file);
+        int set(const std::string& key, const std::string& value, uint32_t time, uint8_t flags, bool is_file);
+        int set(const std::string& key, const std::string& value, bool is_file);
   
-        asio::awaitable<std::string> get_async(std::string key, bool is_file);
-        std::string get(std::string key, bool is_file);
+        asio::awaitable<std::string> get_async(const std::string& key, bool is_file);
+        std::string get(const std::string& key, bool is_file);
 
-        asio::awaitable<int> remove_async(std::string key, bool is_file);
-        int remove(std::string key, bool is_file);
+        asio::awaitable<int> remove_async(const std::string& key, bool is_file);
+        int remove(const std::string& key, bool is_file);
+
+        asio::awaitable<int> update_async(const std::string& key, const UpdateCommand& command);
+        int update(const std::string& key, const UpdateCommand& command);
     public:
         CacheClient(const CacheClient&) = delete;
         CacheClient& operator= (const CacheClient&) = delete;
 
         CacheClient();
-        CacheClient(std::string mem_conf_file);
+        CacheClient(const std::string& mem_conf_file);
         ~CacheClient();
 
-        asio::awaitable<void> connect_async(std::string address, std::string port);
-        void connect(std::string address, std::string port);
+        asio::awaitable<void> connect_async(const std::string& address, const std::string& port);
+        void connect(const std::string& address, const std::string& port);
         
-        int set_file(std::string key, std::string value);
-        int set_dir(std::string key, std::string value);
-        std::string get_file(std::string key);
-        std::string get_dir(std::string key);
-        int remove_file(std::string key);
-        int remove_dir(std::string key);
+        int set_file(const std::string& key, const std::string& value);
+        int set_dir(const std::string& key, const std::string& value);
+        std::string get_file(const std::string& key);
+        std::string get_dir(const std::string& key);
+        int remove_file(const std::string& key);
+        int remove_dir(const std::string& key);
+        int chmod(const std::string& key, mode_t new_mode);
+        int chown(const std::string& key, uid_t new_uid, gid_t new_gid);
+        int rename(const std::string& old_key, const std::string& new_key);
     };
 }
 

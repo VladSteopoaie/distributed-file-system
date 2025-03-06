@@ -99,10 +99,8 @@ uint8_t OperationCode::to_byte(OperationCode::Type opcode)
             return 6;
         case Type::RM_DIR:
             return 7;
-        case Type::CH_FILE:
+        case Type::UPDATE:
             return 8;
-        case Type::CH_DIR:
-            return 9;
         default:
             return -1;
     }
@@ -129,9 +127,7 @@ OperationCode::Type OperationCode::from_byte(uint8_t byte)
         case 7:
             return Type::RM_DIR;
         case 8:
-            return Type::CH_FILE;
-        case 9:
-            return Type::CH_DIR;
+            return Type::UPDATE;
         default:
             return Type::UNKNOWN;
     }
@@ -157,10 +153,8 @@ std::string OperationCode::to_string(OperationCode::Type opcode)
             return "RM_FILE";
         case Type::RM_DIR:
             return "RM_DIR";
-        case Type::CH_FILE:
-            return "CH_FILE";
-        case Type::CH_DIR:
-            return "CH_DIR";
+        case Type::UPDATE:
+            return "UPDATE";
         default:
             return "UNKNOWN";
     }
@@ -284,17 +278,19 @@ uint8_t BytePacketBuffer::get_byte(size_t pos) const
 }
 
 // get a range of bytes from buffer without changing the position
-uint8_t* BytePacketBuffer::get_range(size_t start, size_t len)
+uint8_t* BytePacketBuffer::get_range(size_t start, size_t len, uint8_t* res)
 {
-    if (start + len >= buffer.size())
+    if (start + len > buffer.size())
         throw std::runtime_error(
             std::format("get_range: Index outside of bounds: tried {} and {}, but size is {}", start, len, buffer.size())
         );
 
-    uint8_t res[len + 1];
-    std::copy(buffer.begin() + start, buffer.begin() + start + len, res);
-    res[len] = 0;
+    if (len > sizeof(res))
+        throw std::runtime_error(
+            std::format("get_range: Buffer too small. Length given: {}, buffer size: {}", len, sizeof(res))
+        );
 
+    std::copy(buffer.begin() + start, buffer.begin() + start + len, res);
     return res;
 }
 
@@ -492,8 +488,8 @@ std::string CachePacket::to_string() const
     result += "--\\ opcode: " + OperationCode::to_string(OperationCode::from_byte(opcode)) + "\n";
     result += "--\\ rescode: " + ResultCode::to_string(ResultCode::from_byte(rescode)) + "\n";
     result += "--\\ flags: " + std::to_string(flags) + "\n";
-    result += "--\\ message_len: " + std::to_string(message_len) + "\n";
     result += "--\\ time: " + std::to_string(time) + "\n";
+    result += "--\\ message_len: " + std::to_string(message_len) + "\n";
     result += "--\\ key_len: " + std::to_string(key_len) + "\n";
     result += "--\\ value_len: " + std::to_string(value_len) + "\n\n";
     result += "--\\ Message:\n";
@@ -514,10 +510,9 @@ std::string CachePacket::to_string() const
 /*###################################*/
 
 UpdateCommand::UpdateCommand() {
-    command_size = 0;
     opcode = 0;
     argc = 0;
-    argv = std::vector<std::string>();
+    argv = std::vector<std::vector<uint8_t>>();
 }
 
 UpdateCommand::UpdateCommand(const uint8_t* buffer, size_t len)
@@ -527,22 +522,20 @@ UpdateCommand::UpdateCommand(const uint8_t* buffer, size_t len)
 
 void UpdateCommand::from_buffer(const uint8_t* buffer, size_t len)
 {
-    command_size = 0;
     BytePacketBuffer command_buffer = BytePacketBuffer(buffer, len);
 
     opcode = command_buffer.read_u8();
     argc = command_buffer.read_u8();
-    command_size += 2; 
 
     // for each argument the length of it is the first byte
     for (uint8_t i = 0; i < argc; i ++)
     {
         uint8_t arg_size = command_buffer.read_u8();
-        command_size += arg_size + 1; // len byte + size of the string
-
-        argv.push_back(std::string(
-            (char*)command_buffer.get_range(command_buffer.get_position(), arg_size)
-        ));
+        uint8_t range[arg_size];
+        command_buffer.get_range(command_buffer.get_position(), arg_size, range); 
+        argv.push_back(
+            std::vector<uint8_t>(range, range + arg_size)
+        );
         command_buffer.step(arg_size);
     }
 }
@@ -550,19 +543,23 @@ void UpdateCommand::from_buffer(const uint8_t* buffer, size_t len)
 size_t UpdateCommand::to_buffer(std::vector<uint8_t>& final_buffer) const 
 {
     BytePacketBuffer command_buffer = BytePacketBuffer();
-    final_buffer.resize(command_size);
+    int command_size = 2 + argv.size(); // argc + opcode + each len byte at the start of each argv[i]
+    for (auto arg : argv)
+        command_size += arg.size();
+
     command_buffer.resize(command_size);
 
     command_buffer.write_u8(opcode);
-    command_buffer.write_u8(argc);
+    command_buffer.write_u8(argv.size());
 
-    for (std::string arg : argv) 
+    for (std::vector<uint8_t> arg : argv) 
     {
-        command_buffer.write_u8(static_cast<uint8_t> (arg.length()));
-        for (size_t i = 0; i < arg.length(); i ++)
+        command_buffer.write_u8(static_cast<uint8_t> (arg.size()));
+        for (size_t i = 0; i < arg.size(); i ++)
             command_buffer.write_u8(arg[i]);
     }
 
+    final_buffer = command_buffer.get_buffer();
     return command_size;
 }
 
@@ -574,7 +571,7 @@ std::string UpdateCommand::to_string() const
 
     for (uint8_t i = 0; i < argc; i ++)
     {
-        result += "----\\ argv[" + std::to_string(i) + "] = " + argv[i] + "\n";
+        result += "----\\ argv[" + std::to_string(i) + "] = " + Utils::get_string_from_byte_array(argv[i]) + "\n";
     }
     result += "\n";
     return result;

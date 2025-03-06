@@ -24,40 +24,34 @@ namespace CacheAPI {
         std::string file_metadata_dir;
         std::string dir_metadata_dir;
 
-        void handle_error(std::string error);
         void handle_request(const CachePacket& request, CachePacket& response);
 
         void update_parent_dir(const std::string& path);
+        void update_memcached_object(const std::string& key, const std::string& path, time_t expiration, uint32_t flags);
+        asio::awaitable<void> update_memcached_object_async(const std::string& key, const std::string& path, time_t expiration, uint32_t flags);
+
         // memcached related 
-        void set_memcached_object(std::string key, std::string value, time_t expiration, uint32_t flags);
-        void set_memcached_object(std::string key, std::string value);
-        asio::awaitable<void> set_memcached_object_async(std::string key, std::string value, time_t expiration, uint32_t flags);
+        void set_memcached_object(const std::string& key, const std::string& value, time_t expiration, uint32_t flags);
+        void set_memcached_object(const std::string& key, const std::string& value);
+        asio::awaitable<void> set_memcached_object_async(const std::string& key, const std::string& value, time_t expiration, uint32_t flags);
 
 
-        std::string get_memcached_object(std::string key);
+        std::string get_memcached_object(const std::string& key);
 
-        void remove_memcached_object(std::string key);
-        asio::awaitable<void> remove_memcached_object_async(std::string key);
+        void remove_memcached_object(const std::string& key);
+        asio::awaitable<void> remove_memcached_object_async(const std::string& key);
        
         void read_socket_async();
         void write_socket_async();
         void init_connection(CachePacket& response);
 
-        // std::string set_local_file(std::string path, mode_t mode);
-        // std::string set_local_dir(std::string path, mode_t mode);
         void set(const CachePacket& request, CachePacket& response, bool is_file);
         
-        // std::string get_local_file(std::string path);
-        // std::string get_local_dir(std::string path);
         void get(const CachePacket& request, CachePacket& response, bool is_file);
 
-        // void remove_local_file(const std::string& path) const;
-        // void remove_local_dir(const std::string& path) const;
         void remove(const CachePacket& request, CachePacket& response, bool is_file);
 
-        // std::string update_local_file(const std::string& path, const UpdateCommand&) const;
-        // std::string update_local_dir(const std::string& path, const UpdateCommand&) const;
-        void update(const CachePacket& request, CachePacket& response, bool is_file);
+        void update(const CachePacket& request, CachePacket& response);
 
     public:
         CacheConnectionHandler(

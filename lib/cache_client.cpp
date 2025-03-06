@@ -13,6 +13,7 @@ asio::awaitable<void> CacheClient::send_request_async(const CachePacket& request
         co_await asio::async_connect(socket, endpoints, asio::use_awaitable);
         
         SPDLOG_DEBUG("Sending packet.");
+        // std::cout << request.to_string() << std::endl;
         std::vector<uint8_t> buffer;
         request.to_buffer(buffer);
 
@@ -33,6 +34,7 @@ asio::awaitable<void> CacheClient::receive_response_async(CachePacket& response)
         std::vector<uint8_t> buffer(CachePacket::max_packet_size);
         size_t bytes_received = co_await socket.async_read_some(asio::buffer(buffer), asio::use_awaitable);
         response.from_buffer(buffer.data(), bytes_received);
+        // std::cout << response.to_string() << std::endl;
     }
     catch (std::exception& e)
     {
@@ -42,7 +44,7 @@ asio::awaitable<void> CacheClient::receive_response_async(CachePacket& response)
     co_return;
 }
 
-std::string CacheClient::get_memcached_object(std::string key)
+std::string CacheClient::get_memcached_object(const std::string& key)
 {
     memcached_return_t error;
     char* result = memcached_get(mem_client, key.c_str(), key.length(), NULL, NULL, &error);
@@ -56,7 +58,7 @@ std::string CacheClient::get_memcached_object(std::string key)
     return result;
 }
 
-asio::awaitable<int> CacheClient::set_async(std::string key, std::string value, uint32_t time, uint8_t flags, bool is_file)
+asio::awaitable<int> CacheClient::set_async(const std::string& key, const std::string& value, uint32_t time, uint8_t flags, bool is_file)
 {
     try {
         CachePacket request, response;
@@ -85,7 +87,7 @@ asio::awaitable<int> CacheClient::set_async(std::string key, std::string value, 
             else 
             {
                 int error = Utils::get_int_from_byte_array(response.message);
-                SPDLOG_ERROR(std::format("Server error: {}", error));
+                SPDLOG_ERROR(std::format("Server error: {}", std::strerror(error)));
                 if (error == 0) error = -1;
             }             
 
@@ -109,7 +111,7 @@ asio::awaitable<int> CacheClient::set_async(std::string key, std::string value, 
 
 }
 
-int CacheClient::set(std::string key, std::string value, uint32_t time, uint8_t flags, bool is_file)
+int CacheClient::set(const std::string& key, const std::string& value, uint32_t time, uint8_t flags, bool is_file)
 {
     std::promise<int> result_promise;
     std::future<int> result_future = result_promise.get_future();
@@ -136,12 +138,12 @@ int CacheClient::set(std::string key, std::string value, uint32_t time, uint8_t 
     }
 }
 
-int CacheClient::set(std::string key, std::string value, bool is_file)
+int CacheClient::set(const std::string& key, const std::string& value, bool is_file)
 {
     return set(key, value, 0, 0, is_file);
 }
 
-asio::awaitable<std::string> CacheClient::get_async(std::string key, bool is_file)
+asio::awaitable<std::string> CacheClient::get_async(const std::string& key, bool is_file)
 {
     try {
         std::string mem_value = get_memcached_object(key);
@@ -167,7 +169,12 @@ asio::awaitable<std::string> CacheClient::get_async(std::string key, bool is_fil
             if (response.message_len == 0)
                 SPDLOG_ERROR("Unknown server error");
             else 
-                SPDLOG_ERROR(std::format("Server error: {}", Utils::get_string_from_byte_array(response.message)));
+            {
+                int error = Utils::get_int_from_byte_array(response.message);
+                SPDLOG_ERROR(std::format("Server error: {}", std::strerror(error)));
+                if (error == 0) error = -1;
+            }
+                // SPDLOG_ERROR(std::format("Server error: {}", Utils::get_string_from_byte_array(response.message)));
             
             co_return "";
         }
@@ -181,7 +188,7 @@ asio::awaitable<std::string> CacheClient::get_async(std::string key, bool is_fil
     co_return "";
 }
 
-std::string CacheClient::get(std::string key, bool is_file)
+std::string CacheClient::get(const std::string& key, bool is_file)
 {
     std::promise<std::string> result_promise;
     std::future<std::string> result_future = result_promise.get_future();
@@ -208,7 +215,7 @@ std::string CacheClient::get(std::string key, bool is_file)
     }
 }
 
-asio::awaitable<int> CacheClient::remove_async(std::string key, bool is_file)
+asio::awaitable<int> CacheClient::remove_async(const std::string& key, bool is_file)
 {
     try {
         // std::cout << "Remove " << key << " " << (is_file ? "file" : "dir") << std::endl;
@@ -218,12 +225,8 @@ asio::awaitable<int> CacheClient::remove_async(std::string key, bool is_file)
             request.opcode = OperationCode::to_byte(OperationCode::Type::RM_FILE);
         else 
             request.opcode = OperationCode::to_byte(OperationCode::Type::RM_DIR);
-        // request.time = time;
-        // request.flags = flags;
         request.key_len = key.length();
-        // request.value_len = value.length();
         request.key = Utils::get_byte_array_from_string(key);
-        // request.value = Utils::get_byte_array_from_string(value);
         co_await send_request_async(request);
         co_await receive_response_async(response);
             
@@ -238,7 +241,7 @@ asio::awaitable<int> CacheClient::remove_async(std::string key, bool is_file)
             else 
             {
                 int error = Utils::get_int_from_byte_array(response.message);
-                SPDLOG_ERROR(std::format("Server error: {}", error));
+                SPDLOG_ERROR(std::format("Server error: {}", std::strerror(error)));
                 if (error == 0) error = -1;
             }             
 
@@ -247,7 +250,7 @@ asio::awaitable<int> CacheClient::remove_async(std::string key, bool is_file)
 
         if (response.rescode == ResultCode::Type::SUCCESS)
         {
-            SPDLOG_INFO("Stored!");
+            SPDLOG_INFO("Removed!");
             co_return 0;
         } 
         
@@ -256,13 +259,13 @@ asio::awaitable<int> CacheClient::remove_async(std::string key, bool is_file)
     }
     catch (std::exception& e)
     {
-        SPDLOG_ERROR(std::format("set_async: {}", e.what()));
+        SPDLOG_ERROR(std::format("remove_async: {}", e.what()));
         co_return -1;
     }
 
 }
 
-int CacheClient::remove(std::string key, bool is_file)
+int CacheClient::remove(const std::string& key, bool is_file)
 {
     std::promise<int> result_promise;
     std::future<int> result_future = result_promise.get_future();
@@ -289,12 +292,93 @@ int CacheClient::remove(std::string key, bool is_file)
     }
 }
 
+asio::awaitable<int> CacheClient::update_async(const std::string& key, const UpdateCommand& command)
+{
+    try {
+        CachePacket request, response;
+        request.id = Utils::generate_id();
+        // if (is_file)
+        //     request.opcode = OperationCode::to_byte(OperationCode::Type::CH_FILE);
+        // else 
+
+        request.opcode = OperationCode::to_byte(OperationCode::Type::UPDATE);
+        request.key_len = key.length();
+        request.key = Utils::get_byte_array_from_string(key);
+        std::cout << command.to_string() << std::endl;
+        command.to_buffer(request.value);
+        request.value_len = request.value.size();
+        std::cout << request.to_string() << std::endl;
+        co_await send_request_async(request);
+        co_await receive_response_async(response);
+            
+        if ((response.id != request.id) || response.rescode == ResultCode::Type::ERRMSG)
+        {
+            int error;
+            if (response.message_len == 0)
+            {
+                SPDLOG_ERROR("Unknown server error");
+                error = -1;
+            }
+            else 
+            {
+                int error = Utils::get_int_from_byte_array(response.message);
+                SPDLOG_ERROR(std::format("Server error: {}", std::strerror(error)));
+                if (error == 0) error = -1;
+            }             
+
+            co_return error;
+        }
+
+        if (response.rescode == ResultCode::Type::SUCCESS)
+        {
+            SPDLOG_INFO("Updated!");
+            co_return 0;
+        } 
+        
+        SPDLOG_ERROR("Invalid packet from server.");
+        co_return -1;
+    }
+    catch (std::exception& e)
+    {
+        SPDLOG_ERROR(std::format("update_async: {}", e.what()));
+        co_return -1;
+    }
+}
+
+int CacheClient::update(const std::string& key, const UpdateCommand& command)
+{
+    std::promise<int> result_promise;
+    std::future<int> result_future = result_promise.get_future();
+
+    asio::co_spawn(
+        context,
+        [&]() -> asio::awaitable<void> {
+            int result = co_await update_async(key, command);
+            result_promise.set_value(result);
+            co_return;
+        },
+        asio::detached
+    );
+
+    context.run();
+    context.restart();
+
+    try {
+        return result_future.get();
+    }
+    catch (std::exception& e)
+    {
+        SPDLOG_ERROR("update: {}", e.what());
+        return -1;
+    }
+}
+
 // public
 CacheClient::CacheClient()
     : CacheClient("")
 {}
 
-CacheClient::CacheClient(std::string mem_conf_string)
+CacheClient::CacheClient(const std::string& mem_conf_string)
     : socket(context)
     , resolver(context)
     , mem_conf_string(mem_conf_string)
@@ -308,7 +392,7 @@ CacheClient::~CacheClient()
     socket.close();
 }
 
-asio::awaitable<void> CacheClient::connect_async(std::string address, std::string port)
+asio::awaitable<void> CacheClient::connect_async(const std::string& address, const std::string& port)
 {
     try {
         this->address = address;
@@ -369,7 +453,7 @@ asio::awaitable<void> CacheClient::connect_async(std::string address, std::strin
     co_return;
 }
 
-void CacheClient::connect(std::string address, std::string port)
+void CacheClient::connect(const std::string& address, const std::string& port)
 {
     std::promise<std::string> result_promise;
     std::future<std::string> result_future = result_promise.get_future();
@@ -405,32 +489,63 @@ void CacheClient::connect(std::string address, std::string port)
 }
 
  
-int CacheClient::set_file(std::string key, std::string value)
+int CacheClient::set_file(const std::string& key, const std::string& value)
 {
     return set(key, value, true);
 }
 
-int CacheClient::set_dir(std::string key, std::string value)
+int CacheClient::set_dir(const std::string& key, const std::string& value)
 {
     return set(key, value, false);
 }
 
-std::string CacheClient::get_file(std::string key)
+std::string CacheClient::get_file(const std::string& key)
 {
     return get(key, true);
 }
 
-std::string CacheClient::get_dir(std::string key)
+std::string CacheClient::get_dir(const std::string& key)
 {
     return get(key, false);
 }
 
-int CacheClient::remove_file(std::string key)
+int CacheClient::remove_file(const std::string& key)
 {
     return remove(key, true);
 }
 
-int CacheClient::remove_dir(std::string key)
+int CacheClient::remove_dir(const std::string& key)
 {
     return remove(key, false);
+}
+
+int CacheClient::chmod(const std::string& key, mode_t new_mode)
+{
+    UpdateCommand command;
+    command.opcode = UpdateCode::to_byte(UpdateCode::Type::CHMOD);
+    std::cout << "New mode: " <<  new_mode << std::endl;
+    command.argv.push_back(Utils::get_byte_array_from_int(new_mode));
+    command.argc = 1;
+    std::cout << command.to_string() << std::endl;
+    std::cout << command.argc << " " << command.opcode << std::endl;
+    return update(key, command);
+}
+
+int CacheClient::chown(const std::string& key, uid_t new_uid, gid_t new_gid)
+{
+    UpdateCommand command;
+    command.opcode = UpdateCode::to_byte(UpdateCode::Type::CHOWN);
+    command.argv.push_back(Utils::get_byte_array_from_int(new_uid));
+    command.argv.push_back(Utils::get_byte_array_from_int(new_gid));
+    command.argc = 2;
+    return update(key, command);
+}
+
+int CacheClient::rename(const std::string& old_key, const std::string& new_key)
+{
+    UpdateCommand command;
+    command.opcode = UpdateCode::to_byte(UpdateCode::Type::RENAME);
+    command.argv.push_back(Utils::get_byte_array_from_string(new_key));
+    command.argc = 1;
+    return update(old_key, command);
 }

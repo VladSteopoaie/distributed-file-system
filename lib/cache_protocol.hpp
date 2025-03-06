@@ -30,8 +30,7 @@ namespace OperationCode {
         SET_DIR = 5,
         RM_FILE = 6,
         RM_DIR = 7,
-        CH_FILE = 8, // change commands (update)
-        CH_DIR = 9,
+        UPDATE = 8
     };
 
     uint8_t to_byte(Type opcode);
@@ -81,7 +80,7 @@ public:
     uint8_t get_byte(size_t pos) const;
 
     // get a range of bytes from buf without changing the position
-    uint8_t* get_range(size_t start, size_t len);
+    uint8_t* get_range(size_t start, size_t len, uint8_t* res);
 
     // read one byte from the buffer's position and change the position
     uint8_t read_u8();
@@ -126,10 +125,9 @@ struct CachePacket {
 };
 
 struct UpdateCommand {
-    uint16_t command_size;
     uint8_t opcode;
     uint8_t argc;
-    std::vector<std::string> argv;
+    std::vector<std::vector<uint8_t>> argv; // vector of strings basically
 
     UpdateCommand();
     UpdateCommand(const uint8_t* buffer, size_t len);

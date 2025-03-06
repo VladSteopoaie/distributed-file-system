@@ -149,7 +149,7 @@ uint32_t Utils::get_int_from_byte_array(std::vector<uint8_t> byte_array)
 {
     uint32_t value = 0;
     for (int i = 0; i < 4; i ++)
-        value += static_cast<uint32_t> (byte_array[i] << (3 - i));
+        value += static_cast<uint32_t> (byte_array[i] << ((3 - i) * 8));
     return value;
 }
 

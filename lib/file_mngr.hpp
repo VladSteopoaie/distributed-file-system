@@ -16,11 +16,13 @@ namespace FileMngr {
     void remove_local_file(const std::string& path);
     void remove_local_dir(const std::string& path, const std::string& meta_path);
 
-    void chmod_file(const std::string& path, Stat& file_proto);
-    void chown_file(const std::string& path, Stat& file_proto);
-    void rename_file(const std::string& path, Stat& file_proto);
-    std::string update_local_file(const std::string& path, const UpdateCommand&);
-    std::string update_local_dir(const std::string& path, const std::string& meta_path, const UpdateCommand&);
+    std::string chmod_object(const std::string& path, const std::vector<std::vector<uint8_t>>& argv);
+    std::string chown_object(const std::string& path, const std::vector<std::vector<uint8_t>>& argv);
+    std::string rename_object(const std::string& path, const std::string& dir, const std::vector<std::vector<uint8_t>>& argv);
+    std::string update_local_object(const std::string& path, const std::string& file_metadata_dir, const std::string& dir_metadata_dir, const UpdateCommand& command, bool is_file);
+    std::string update_local_file(const std::string& path, const std::string& file_metadata_dir, const UpdateCommand& command);
+    std::string update_local_dir(const std::string& path, const std::string& file_metadata_dir, const std::string& dir_metadata_dir, const UpdateCommand& command);
+    // std::string update_local_dir(const std::string& path, const std::string& meta_path, const UpdateCommand&);
 }
 
 #endif

@@ -29,7 +29,7 @@ static int myfs_getattr(const char *path, struct stat *stat_buf, struct fuse_fil
 		if (proto_str.empty())
 			return -ENOENT;		
 
-	proto.ParseFromString(proto_str);	
+	proto.ParseFromString(proto_str);
 	Utils::proto_to_struct_stat(proto, stat_buf);
 
 	return 0;
@@ -41,7 +41,6 @@ static int myfs_mkdir(const char *path, mode_t mode)
 
 	if (error < 0)
 	{
-		// fprintf(stderr, "Error: failed to create the directory, please verify the logs!");
 		return -EIO;
 	}
 
@@ -54,7 +53,6 @@ static int myfs_unlink(const char *path)
 
 	if (error < 0)
 	{
-		// fprintf(stderr, "Error: failed to remove the file, please verify the logs!");
 		return -EIO;
 	}
 
@@ -67,7 +65,6 @@ static int myfs_rmdir(const char *path)
 
 	if (error < 0)
 	{
-		// fprintf(stderr, "Error: failed to remove the file, please verify the logs!");
 		return -EIO;
 	}
 
@@ -77,16 +74,37 @@ static int myfs_rmdir(const char *path)
 
 static int myfs_rename(const char *old_path, const char *new_path, unsigned int flags)
 {
+	int error = cache_client.rename(old_path, new_path);
+
+	if (error < 0)
+	{
+		return -EIO;
+	}
+
 	return 0;
 }
 
 static int myfs_chmod(const char *path, mode_t mode, struct fuse_file_info *file_info)
 {
+	int error = cache_client.chmod(path, mode);
+
+	if (error < 0)
+	{
+		return -EIO;
+	}
+
 	return 0;
 }
 
 static int myfs_chown(const char *path, uid_t uid, gid_t gid, struct fuse_file_info *file_info)
 {
+	int error = cache_client.chown(path, uid, gid);
+
+	if (error < 0)
+	{
+		return -EIO;
+	}
+
 	return 0;
 }
 
@@ -211,7 +229,7 @@ int main(int argc, char** argv)
 	int ret;
 	HostInfo host_info;
 	struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
-	spdlog::set_level(spdlog::level::debug); // Set global log level to debug
+	spdlog::set_level(spdlog::level::info); // Set global log level to debug
 	spdlog::set_pattern("(%s:%#) [%^%l%$] %v");
 	// Parse command-line arguments
     for (int i = 0; i < argc; ++i) {
