@@ -40,42 +40,50 @@ void CacheConnectionHandler::handle_request(const CachePacket& request, CachePac
     response.opcode = request.opcode;
 
     SPDLOG_DEBUG(std::format("Processing: {}", OperationCode::to_string(OperationCode::from_byte(request.opcode))));
-    switch (OperationCode::from_byte(request.opcode))
-    {
-        case OperationCode::Type::NOP:
-            response.rescode = ResultCode::to_byte(ResultCode::Type::SUCCESS);
-            break;
-        case OperationCode::Type::INIT:
-            init_connection(response);
-            break;
-        case OperationCode::Type::GET_FILE:
-            get(request, response, true);
-            break;
-        case OperationCode::Type::GET_DIR:
-            get(request, response, false);
-            break;
-        case OperationCode::Type::SET_FILE:
-            set(request, response, true);
-            break;
-        case OperationCode::Type::SET_DIR:
-            set(request, response, false);
-            break;
-        case OperationCode::Type::RM_FILE:
-            remove(request, response, true);
-            break;
-        case OperationCode::Type::RM_DIR:
-            remove(request, response, false);
-            break;
-        case OperationCode::Type::UPDATE:
-            update(request, response);
-            break;
-        
-        default:
-            response.rescode = ResultCode::to_byte(ResultCode::Type::INVOP);
-            break;
+    try {
+        switch (OperationCode::from_byte(request.opcode))
+        {
+            case OperationCode::Type::NOP:
+                response.rescode = ResultCode::to_byte(ResultCode::Type::SUCCESS);
+                break;
+            case OperationCode::Type::INIT:
+                init_connection(response);
+                break;
+            case OperationCode::Type::GET_FILE:
+                get(request, response, true);
+                break;
+            case OperationCode::Type::GET_DIR:
+                get(request, response, false);
+                break;
+            case OperationCode::Type::SET_FILE:
+                set(request, response, true);
+                break;
+            case OperationCode::Type::SET_DIR:
+                set(request, response, false);
+                break;
+            case OperationCode::Type::RM_FILE:
+                remove(request, response, true);
+                break;
+            case OperationCode::Type::RM_DIR:
+                remove(request, response, false);
+                break;
+            case OperationCode::Type::UPDATE:
+                update(request, response);
+                break;
+            
+            default:
+                response.rescode = ResultCode::to_byte(ResultCode::Type::INVOP);
+                break;
+        } // switch
     }
-
-}
+    catch (std::exception& e)
+    {
+        SPDLOG_ERROR(e.what());
+        response.rescode = ResultCode::to_byte(ResultCode::Type::ERRMSG);
+        response.message_len = 4;
+        response.message = Utils::get_byte_array_from_int(errno);
+    }
+} // handle_request
 
 void CacheConnectionHandler::update_parent_dir(const std::string& path)
 {
@@ -119,9 +127,6 @@ asio::awaitable<void> CacheConnectionHandler::update_memcached_object_async(cons
 
 void CacheConnectionHandler::set_memcached_object(const std::string& key, const std::string& value, time_t expiration, uint32_t flags)
 {
-    std::cout << "SET:" << std::endl;
-    std::cout << key.length() << " -> " << key << std::endl;
-    std::cout << value.length() << " -> " << value << std::endl;
     memcached_return_t result = memcached_set(mem_client, 
             key.c_str(), key.size(), 
             value.c_str(), value.size(),
@@ -169,7 +174,6 @@ std::string CacheConnectionHandler::get_memcached_object(const std::string& key)
 
     return result;
 }
-
 
 void CacheConnectionHandler::remove_memcached_object(const std::string& key) 
 {
@@ -238,7 +242,7 @@ void CacheConnectionHandler::write_socket_async()
                 return;
             }
 
-            SPDLOG_INFO("Connection handled successfully!");
+            // SPDLOG_INFO("Connection handled successfully!");
         });
 }
 
@@ -291,16 +295,12 @@ void CacheConnectionHandler::set(const CachePacket& request, CachePacket& respon
         // the memcached server
         update_parent_dir(path);
         response.rescode = ResultCode::to_byte(ResultCode::Type::SUCCESS);
-    }
+    } // try
     catch (std::exception& e)
     {
-        std::string message = std::format("set: {}", e.what());
-        SPDLOG_ERROR(message);
-        response.rescode = ResultCode::to_byte(ResultCode::Type::ERRMSG);
-        response.message_len = 4;
-        response.message = Utils::get_byte_array_from_int(errno);
+        throw std::runtime_error(std::format("set: {}", e.what()));
     }
-}
+} // set
 
 void CacheConnectionHandler::get(const CachePacket& request, CachePacket& response, bool is_file)
 {
@@ -315,8 +315,6 @@ void CacheConnectionHandler::get(const CachePacket& request, CachePacket& respon
         else
             value = FileMngr::get_local_dir(file_path, dir_path);
 
-        // std::cout << "value: " << value.length() << " -> " << value << std::endl;
-
         if (!value.empty())
             asio::co_spawn(context, set_memcached_object_async(path, value, 0, 0), asio::detached);
 
@@ -326,14 +324,15 @@ void CacheConnectionHandler::get(const CachePacket& request, CachePacket& respon
     }
     catch (std::exception& e)
     {
-        std::string message = std::format("get: {}", e.what());
-        SPDLOG_ERROR(message);
-        response.rescode = ResultCode::to_byte(ResultCode::Type::ERRMSG);
-        response.message_len = 4;
-        response.message = Utils::get_byte_array_from_int(errno);
+        throw std::runtime_error(std::format("get: {}", e.what()));
+        // std::string message = std::format("get: {}", e.what());
+        // SPDLOG_ERROR(message);
+        // response.rescode = ResultCode::to_byte(ResultCode::Type::ERRMSG);
+        // response.message_len = 4;
+        // response.message = Utils::get_byte_array_from_int(errno);
     }
 
-}
+} // get
 
 void CacheConnectionHandler::remove(const CachePacket& request, CachePacket& response, bool is_file)
 {
@@ -353,14 +352,14 @@ void CacheConnectionHandler::remove(const CachePacket& request, CachePacket& res
     }
     catch (std::exception& e)
     {
-        std::string message = std::format("remove: {}", e.what());
-        SPDLOG_ERROR(message);
-        response.rescode = ResultCode::to_byte(ResultCode::Type::ERRMSG);
-        response.message_len = 4;
-        response.message = Utils::get_byte_array_from_int(errno);
+        throw std::runtime_error(std::format("remove: {}", e.what()));
+        // std::string message = std::format("remove: {}", e.what());
+        // SPDLOG_ERROR(message);
+        // response.rescode = ResultCode::to_byte(ResultCode::Type::ERRMSG);
+        // response.message_len = 4;
+        // response.message = Utils::get_byte_array_from_int(errno);
     }
-
-}
+} // remove
 
 void CacheConnectionHandler::update(const CachePacket& request, CachePacket& response) 
 {
@@ -370,9 +369,8 @@ void CacheConnectionHandler::update(const CachePacket& request, CachePacket& res
         std::string file_path = Utils::process_path(path, file_metadata_dir);
         std::string dir_path = Utils::process_path(path, dir_metadata_dir);
         std::string value, rename_content;
-        std::cout << request.to_string() << std::endl;
         UpdateCommand command = UpdateCommand(request.value.data(), request.value.size());
-        std::cout << command.to_string() << std::endl;
+
         if (std::filesystem::is_regular_file(file_path))
             is_file = true;
         else if (std::filesystem::is_directory(file_path))
@@ -411,11 +409,11 @@ void CacheConnectionHandler::update(const CachePacket& request, CachePacket& res
     }
     catch (std::exception& e)
     {
-        std::string message = std::format("update: {}", e.what());
-        SPDLOG_ERROR(message);
-        response.rescode = ResultCode::to_byte(ResultCode::Type::ERRMSG);
-        response.message_len = 4;
-        response.message = Utils::get_byte_array_from_int(errno);
+        throw std::runtime_error(std::format("update: {}", e.what()));
+        // std::string message = std::format("update: {}", e.what());
+        // SPDLOG_ERROR(message);
+        // response.rescode = ResultCode::to_byte(ResultCode::Type::ERRMSG);
+        // response.message_len = 4;
+        // response.message = Utils::get_byte_array_from_int(errno);
     }
-
-}
+} // update

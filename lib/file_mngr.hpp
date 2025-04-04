@@ -22,7 +22,6 @@ namespace FileMngr {
     std::string update_local_object(const std::string& path, const std::string& file_metadata_dir, const std::string& dir_metadata_dir, const UpdateCommand& command, bool is_file);
     std::string update_local_file(const std::string& path, const std::string& file_metadata_dir, const UpdateCommand& command);
     std::string update_local_dir(const std::string& path, const std::string& file_metadata_dir, const std::string& dir_metadata_dir, const UpdateCommand& command);
-    // std::string update_local_dir(const std::string& path, const std::string& meta_path, const UpdateCommand&);
 }
 
 #endif

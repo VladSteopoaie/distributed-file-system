@@ -3,20 +3,7 @@
 /*################################*/
 /*---------[ ResultCode ]---------*/
 /*################################*/
-// namespace ResultCode {
-//     enum Type {
-//         UNKNOWN, // type unkown
-//         SUCCESS = 0, // no problems here :)
-//         INVPKT = 1, // invalid packet error
-//         INVOP = 2, // invalid operation
-//         NOLOCAL = 3, // no local memcached servers
-//         ERRMSG = 4, // error with a message
-//     };
 
-//     uint8_t to_byte(Type rescode);
-//     Type from_byte(uint8_t byte);
-//     std::string to_string(Type rescode);
-// }
 uint8_t ResultCode::to_byte(Type rescode)
 {
     switch (rescode)

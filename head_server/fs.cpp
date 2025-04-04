@@ -209,9 +209,9 @@ static const struct fuse_operations myfs_oper = {
 	.mkdir 		= myfs_mkdir,
 	.unlink		= myfs_unlink,
 	.rmdir		= myfs_rmdir,
-	.rename		= myfs_rename, // todo
-	.chmod		= myfs_chmod, // todo
-	.chown		= myfs_chown, // todo
+	.rename		= myfs_rename,
+	.chmod		= myfs_chmod, 
+	.chown		= myfs_chown, 
 	.open		= myfs_open,
 	// .read		= myfs_read,
     // .write 	    = myfs_write,
@@ -229,17 +229,17 @@ int main(int argc, char** argv)
 	int ret;
 	HostInfo host_info;
 	struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
-	spdlog::set_level(spdlog::level::info); // Set global log level to debug
+	spdlog::set_level(spdlog::level::info); // Set global log level
 	spdlog::set_pattern("(%s:%#) [%^%l%$] %v");
 	// Parse command-line arguments
     for (int i = 0; i < argc; ++i) {
         if (strcmp(argv[i], "--address") == 0 && i + 1 < argc) {
             host_info.address = argv[i + 1];
-            i++; // Skip the next argument
+            i++; 
         }
         else if (strcmp(argv[i], "--port") == 0 && i + 1 < argc) {
             host_info.port = argv[i + 1];
-            i++; // Skip the next argument
+            i++; 
         }
 		else {
 			fuse_opt_add_arg(&args, argv[i]);

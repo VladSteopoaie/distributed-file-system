@@ -1,0 +1,27 @@
+FROM ubuntu:latest
+
+RUN mkdir -p /project/lib
+
+COPY ./lib /project/lib
+COPY ./metadata_server /project/
+
+RUN apt update && apt install -y build-essential net-tools iputils-ping git wget vim memcached libmemcached-tools libmemcached-dev libfmt-dev libprotobuf-dev protobuf-compiler libspdlog-dev
+
+WORKDIR /project/lib
+RUN rm metadata.pb*
+RUN protoc --cpp_out=. metadata.proto
+RUN mv metadata.pb.cc metadata.pb.cpp
+
+RUN mkdir /stuff
+WORKDIR /stuff
+RUN git clone https://github.com/chriskohlhoff/asio.git
+RUN cp -r asio/asio/include/asio /usr/local/include/
+RUN cp asio/asio/include/asio.hpp /usr/local/include/
+RUN wget https://github.com/CLIUtils/CLI11/releases/download/v2.5.0/CLI11.hpp
+RUN cp CLI11.hpp /usr/local/include/
+
+WORKDIR /project
+RUN make -f Makefile_docker SRC=test_server.cpp
+RUN chmod +x -R ./bin 
+
+RUN useradd -m -s /bin/bash meta_s

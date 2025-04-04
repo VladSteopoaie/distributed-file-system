@@ -13,7 +13,6 @@ asio::awaitable<void> CacheClient::send_request_async(const CachePacket& request
         co_await asio::async_connect(socket, endpoints, asio::use_awaitable);
         
         SPDLOG_DEBUG("Sending packet.");
-        // std::cout << request.to_string() << std::endl;
         std::vector<uint8_t> buffer;
         request.to_buffer(buffer);
 
@@ -34,7 +33,6 @@ asio::awaitable<void> CacheClient::receive_response_async(CachePacket& response)
         std::vector<uint8_t> buffer(CachePacket::max_packet_size);
         size_t bytes_received = co_await socket.async_read_some(asio::buffer(buffer), asio::use_awaitable);
         response.from_buffer(buffer.data(), bytes_received);
-        // std::cout << response.to_string() << std::endl;
     }
     catch (std::exception& e)
     {
@@ -102,14 +100,14 @@ asio::awaitable<int> CacheClient::set_async(const std::string& key, const std::s
         
         SPDLOG_ERROR("Invalid packet from server.");
         co_return -1;
-    }
+    } // try
     catch (std::exception& e)
     {
         SPDLOG_ERROR(std::format("set_async: {}", e.what()));
         co_return -1;
     }
 
-}
+} // set_async
 
 int CacheClient::set(const std::string& key, const std::string& value, uint32_t time, uint8_t flags, bool is_file)
 {
@@ -179,14 +177,14 @@ asio::awaitable<std::string> CacheClient::get_async(const std::string& key, bool
             co_return "";
         }
         co_return Utils::get_string_from_byte_array(response.value);
-    }
+    } // try
     catch (std::exception& e)
     {
         SPDLOG_ERROR(std::format("get_async: {}", e.what()));
     }
 
     co_return "";
-}
+} // get_async
 
 std::string CacheClient::get(const std::string& key, bool is_file)
 {
@@ -218,7 +216,6 @@ std::string CacheClient::get(const std::string& key, bool is_file)
 asio::awaitable<int> CacheClient::remove_async(const std::string& key, bool is_file)
 {
     try {
-        // std::cout << "Remove " << key << " " << (is_file ? "file" : "dir") << std::endl;
         CachePacket request, response;
         request.id = Utils::generate_id();
         if (is_file)
@@ -262,8 +259,7 @@ asio::awaitable<int> CacheClient::remove_async(const std::string& key, bool is_f
         SPDLOG_ERROR(std::format("remove_async: {}", e.what()));
         co_return -1;
     }
-
-}
+} // remove_async
 
 int CacheClient::remove(const std::string& key, bool is_file)
 {
@@ -297,17 +293,12 @@ asio::awaitable<int> CacheClient::update_async(const std::string& key, const Upd
     try {
         CachePacket request, response;
         request.id = Utils::generate_id();
-        // if (is_file)
-        //     request.opcode = OperationCode::to_byte(OperationCode::Type::CH_FILE);
-        // else 
-
         request.opcode = OperationCode::to_byte(OperationCode::Type::UPDATE);
         request.key_len = key.length();
         request.key = Utils::get_byte_array_from_string(key);
-        std::cout << command.to_string() << std::endl;
         command.to_buffer(request.value);
         request.value_len = request.value.size();
-        std::cout << request.to_string() << std::endl;
+
         co_await send_request_async(request);
         co_await receive_response_async(response);
             
@@ -337,13 +328,13 @@ asio::awaitable<int> CacheClient::update_async(const std::string& key, const Upd
         
         SPDLOG_ERROR("Invalid packet from server.");
         co_return -1;
-    }
+    } // try
     catch (std::exception& e)
     {
         SPDLOG_ERROR(std::format("update_async: {}", e.what()));
         co_return -1;
     }
-}
+} // update_async
 
 int CacheClient::update(const std::string& key, const UpdateCommand& command)
 {
@@ -431,7 +422,7 @@ asio::awaitable<void> CacheClient::connect_async(const std::string& address, con
                 case ResultCode::Type::NOLOCAL:
                     throw std::runtime_error("No local memcached server found, a configuration string is required.");
             }
-        }
+        } // if
 
         // check for a configuration file
         Utils::prepare_conf_string(mem_conf_string);
@@ -443,7 +434,7 @@ asio::awaitable<void> CacheClient::connect_async(const std::string& address, con
             throw std::runtime_error("Memcached error when initializing connectivity!");
         }
         SPDLOG_INFO("Connected successfully!");
-    }
+    } // try
     catch (std::exception& e)
     {
         // SPDLOG_ERROR("connect_async: {}", e.what());
@@ -451,7 +442,7 @@ asio::awaitable<void> CacheClient::connect_async(const std::string& address, con
     }
 
     co_return;
-}
+} // connect_async
 
 void CacheClient::connect(const std::string& address, const std::string& port)
 {
@@ -523,11 +514,8 @@ int CacheClient::chmod(const std::string& key, mode_t new_mode)
 {
     UpdateCommand command;
     command.opcode = UpdateCode::to_byte(UpdateCode::Type::CHMOD);
-    std::cout << "New mode: " <<  new_mode << std::endl;
     command.argv.push_back(Utils::get_byte_array_from_int(new_mode));
     command.argc = 1;
-    std::cout << command.to_string() << std::endl;
-    std::cout << command.argc << " " << command.opcode << std::endl;
     return update(key, command);
 }
 

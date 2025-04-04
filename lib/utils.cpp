@@ -57,14 +57,11 @@ void Utils::prepare_conf_string(std::string& mem_conf_string)
 
 uint16_t Utils::generate_id()
 {
-     // Create a random device and seed the random number generator
     static std::random_device rd;
     static std::mt19937 gen(rd());
 
-    // Define the range for uint16_t, excluding 0
     static std::uniform_int_distribution<uint16_t> dist(1, std::numeric_limits<uint16_t>::max());
 
-    // Generate and return a random value
     return dist(gen);
 }
 

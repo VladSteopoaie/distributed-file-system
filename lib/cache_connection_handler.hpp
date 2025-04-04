@@ -35,22 +35,18 @@ namespace CacheAPI {
         void set_memcached_object(const std::string& key, const std::string& value);
         asio::awaitable<void> set_memcached_object_async(const std::string& key, const std::string& value, time_t expiration, uint32_t flags);
 
-
         std::string get_memcached_object(const std::string& key);
 
         void remove_memcached_object(const std::string& key);
         asio::awaitable<void> remove_memcached_object_async(const std::string& key);
-       
+
         void read_socket_async();
         void write_socket_async();
         void init_connection(CachePacket& response);
 
         void set(const CachePacket& request, CachePacket& response, bool is_file);
-        
         void get(const CachePacket& request, CachePacket& response, bool is_file);
-
         void remove(const CachePacket& request, CachePacket& response, bool is_file);
-
         void update(const CachePacket& request, CachePacket& response);
 
     public:

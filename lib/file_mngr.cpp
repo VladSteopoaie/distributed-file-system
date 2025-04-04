@@ -2,7 +2,6 @@
 
 std::string FileMngr::set_local_file(const std::string& file_path, mode_t mode)
 {
-    SPDLOG_DEBUG(std::format("Path: {}", file_path));
     std::string result;
     Stat file_proto;
     struct stat file_stat;
@@ -25,10 +24,6 @@ std::string FileMngr::set_local_file(const std::string& file_path, mode_t mode)
 
 void FileMngr::set_local_dir(const std::string& path, const std::string& meta_path, mode_t mode)
 {
-    SPDLOG_DEBUG(std::format("Path: {}", path));
-    // std::string result_string;
-    // // Stat dir_proto;
-    // // struct stat dir_stat;
     int result;
 
     result = mkdir(path.c_str(), mode);
@@ -37,22 +32,11 @@ void FileMngr::set_local_dir(const std::string& path, const std::string& meta_pa
     result = mkdir(meta_path.c_str(), mode);
     if (result != 0)
         throw std::runtime_error(std::format("set_local_dir: {}", std::strerror(errno)));
-
-    // if (stat(dir_path.c_str(), &dir_stat) != 0)
-    //     throw std::runtime_error(std::format("set_local_dir: {}", std::strerror(errno)));
-
-    // Utils::struct_stat_to_proto(&dir_stat, dir_proto);
-    // dir_proto.SerializeToString(&result_string);
-
-
-    // return result_string;
 }
 
 
 std::string FileMngr::get_local_file(const std::string& path)
 {
-    std::cout << "Path file: " << path << std::endl;
-    SPDLOG_DEBUG(std::format("Path: {}", path));
     std::ifstream file(path);
 
     if (!file)
@@ -65,10 +49,7 @@ std::string FileMngr::get_local_file(const std::string& path)
 
 std::string FileMngr::get_local_dir(const std::string& path, const std::string& meta_path, bool update_dir_list)
 {
-    std::cout << "Path dir: " << path << std::endl;
-    SPDLOG_DEBUG(std::format("Path file: {}", path));
-    SPDLOG_DEBUG(std::format("Path dir: {}", meta_path));
-    std::string meta_dir_file = meta_path + "/.this";
+    std::string meta_dir_file = meta_path + "/.this"; // file that contains metadata of directory
     std::string result;
     if (update_dir_list == false)
     {
@@ -108,9 +89,7 @@ std::string FileMngr::get_local_dir(const std::string& path, const std::string& 
     if (errno != 0)
         throw std::runtime_error(std::format("get_local_dir: {}", std::strerror(errno)));
 
-
     dir_proto.SerializeToString(&result);
-
 
     o_file.open(meta_dir_file);
     if (!o_file.is_open())
@@ -119,10 +98,8 @@ std::string FileMngr::get_local_dir(const std::string& path, const std::string& 
     o_file << result;
     o_file.close();
 
-    // std::cout << "result: " << result << std::endl;
-    // std::cout << "result: " << result.length() << " -> " << result << std::endl;
     return result;
-}
+} // get_local_dir
 
 int FileMngr::rmdir_recursive(const char* path)
 {
@@ -152,7 +129,7 @@ int FileMngr::rmdir_recursive(const char* path)
     closedir(dir);
     int res = rmdir(path);
     return res;
-}
+} // rmdir_recursive
 
 void FileMngr::remove_local_file(const std::string& path)
 {
@@ -243,7 +220,6 @@ std::string FileMngr::update_local_object(const std::string& path, const std::st
         std::string file_meta = file_metadata_dir + path;
         std::string dir_meta = dir_metadata_dir + path;
         std::string content;
-        std::cout << command.to_string() << std::endl;
         switch (UpdateCode::from_byte(command.opcode))
         {
             case UpdateCode::Type::CHMOD:
