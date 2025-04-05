@@ -14,12 +14,13 @@ services:
       - NET_RAW
     
     tty: true
+    privileged: true
 
     networks:
       net:
         ipv4_address: "192.168.1.100"
     
-    # command: bash -c "/scripts/setup.sh && sleep infinity"
+    command: bash -c "sleep infinity"
 
   #### METADATA SERVER ####
   metadata_server:
@@ -40,70 +41,70 @@ services:
       net:
         ipv4_address: "192.168.1.101"
 
-    # command: bash -c "/scripts/setup.sh && sleep infinity"
+    command: bash -c "sleep infinity"
   
   #### STORAGE SERVERS ####
 
   #### SERVER 1 ####
-  server1:
-    container_name: server1
+  # server1:
+  #   container_name: server1
 
-    build:
-      context: .
-      dockerfile: storage_server/dockerfile
+  #   build:
+  #     context: .
+  #     dockerfile: storage_server/dockerfile
     
-    cap_add:
-      - NET_ADMIN
-      - SYS_ADMIN
-      - NET_RAW
+  #   cap_add:
+  #     - NET_ADMIN
+  #     - SYS_ADMIN
+  #     - NET_RAW
     
-    tty: true
+  #   tty: true
 
-    networks:
-      net:
-        ipv4_address: "192.168.1.201"
+  #   networks:
+  #     net:
+  #       ipv4_address: "192.168.1.201"
     
-    # command: bash -c "/scripts/setup.sh && sleep infinity"
+  #   # command: bash -c "/scripts/setup.sh && sleep infinity"
 
-  #### SERVER 2 ####
-  server2:
-    container_name: server2
+  # #### SERVER 2 ####
+  # server2:
+  #   container_name: server2
     
-    build:
-      context: .
-      dockerfile: storage_server/dockerfile
+  #   build:
+  #     context: .
+  #     dockerfile: storage_server/dockerfile
 
-    cap_add:
-      - NET_ADMIN
-      - SYS_ADMIN
-      - NET_RAW
+  #   cap_add:
+  #     - NET_ADMIN
+  #     - SYS_ADMIN
+  #     - NET_RAW
     
-    tty: true
+  #   tty: true
 
-    networks:
-      net:
-        ipv4_address: "192.168.1.202"
+  #   networks:
+  #     net:
+  #       ipv4_address: "192.168.1.202"
 
-    # command: bash -c "/scripts/setup.sh && sleep infinity"
+  #   # command: bash -c "/scripts/setup.sh && sleep infinity"
   
-  #### SERVER 3 ####
-  server3:
-    container_name: server3
+  # #### SERVER 3 ####
+  # server3:
+  #   container_name: server3
     
-    build:
-      context: .
-      dockerfile: storage_server/dockerfile
+  #   build:
+  #     context: .
+  #     dockerfile: storage_server/dockerfile
 
-    cap_add:
-      - NET_ADMIN
-      - SYS_ADMIN
-      - NET_RAW
+  #   cap_add:
+  #     - NET_ADMIN
+  #     - SYS_ADMIN
+  #     - NET_RAW
     
-    tty: true
+  #   tty: true
 
-    networks:
-      net:
-        ipv4_address: "192.168.1.203"
+  #   networks:
+  #     net:
+  #       ipv4_address: "192.168.1.203"
 
     # command: bash -c "/scripts/setup.sh && sleep infinity"
     

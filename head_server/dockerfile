@@ -1,0 +1,37 @@
+FROM ubuntu:latest
+
+RUN mkdir -p /project/lib
+
+COPY ./lib /project/lib
+COPY ./head_server /project/
+
+# installing everything
+RUN apt update && apt install -y build-essential net-tools iputils-ping git wget vim memcached meson fuse3 libfuse3-dev libmemcached-tools libmemcached-dev libfmt-dev libprotobuf-dev protobuf-compiler libspdlog-dev
+
+# ensuring the protofiles are well-generated
+WORKDIR /project/lib
+RUN rm metadata.pb*
+RUN protoc --cpp_out=. metadata.proto
+RUN mv metadata.pb.cc metadata.pb.cpp
+
+# installing ASIO and CLI11
+RUN mkdir /stuff
+WORKDIR /stuff
+RUN git clone https://github.com/chriskohlhoff/asio.git
+RUN cp -r asio/asio/include/asio /usr/local/include/
+RUN cp asio/asio/include/asio.hpp /usr/local/include/
+RUN wget https://github.com/libfuse/libfuse/releases/download/fuse-3.17.1/fuse-3.17.1.tar.gz
+RUN tar xf fuse-3.17.1.tar.gz
+RUN mkdir fuse-3.17.1/build
+WORKDIR fuse-3.17.1/build
+RUN meson setup ..
+RUN ninja
+
+# compiling the project
+WORKDIR /project
+RUN make -f Makefile_docker SRC=fs.cpp
+# RUN chmod +x -R ./bin 
+RUN chmod 777 -R .
+
+# adding a user so I don't run the binary as root
+RUN useradd -m -s /bin/bash head_s
