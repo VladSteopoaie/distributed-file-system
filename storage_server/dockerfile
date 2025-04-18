@@ -1,0 +1,55 @@
+FROM ubuntu:latest
+
+RUN mkdir -p /project/mpi
+RUN mkdir -p /project/scripts
+COPY ./storage_server/scripts /project/scripts
+COPY ./mpi /project/mpi
+
+# installing everything
+RUN apt update && apt install -y \
+    build-essential net-tools iputils-ping git wget vim \
+    openssh-client openssh-server zlib1g-dev
+
+ARG USERNAME=storage_s1
+ARG USER_UID=1001
+ARG USER_GID=$USER_UID
+
+WORKDIR /etc/sudoers.d
+
+# Create user and group
+RUN groupadd --gid $USER_GID $USERNAME \
+    && useradd --uid $USER_UID --gid $USER_GID -m -s /bin/bash $USERNAME \
+    # Add sudo support (optional)
+    && echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/$USERNAME \
+    && chmod 0440 /etc/sudoers.d/$USERNAME
+
+# Set the working directory to user's home
+WORKDIR /home/$USERNAME
+RUN mkdir -p /home/$USERNAME/.ssh && chmod 700 /home/$USERNAME/.ssh
+RUN cp /project/mpi/ssh_config /home/$USERNAME/.ssh/config
+
+# SSH keys
+RUN cp /project/mpi/id_rsa /home/$USERNAME/.ssh
+RUN cp /project/mpi/id_rsa.pub /home/$USERNAME/.ssh
+RUN chown $USERNAME:$USERNAME /home/$USERNAME/.ssh/id_rsa
+RUN chmod 600 /home/$USERNAME/.ssh/id_rsa
+RUN cat /home/$USERNAME/.ssh/id_rsa.pub >> /home/$USERNAME/.ssh/authorized_keys && \
+    chmod 600 /home/$USERNAME/.ssh/authorized_keys
+RUN mkdir /var/run/sshd
+EXPOSE 22
+
+# Download OpenMPI
+WORKDIR /project/mpi
+RUN wget https://download.open-mpi.org/release/open-mpi/v5.0/openmpi-5.0.7.tar.gz
+RUN tar xf openmpi-5.0.7.tar.gz
+WORKDIR /project/mpi/openmpi-5.0.7
+
+RUN ./configure 2>&1 | tee config.out
+RUN make all 2>&1 | tee make.out
+RUN make install 2>&1 | tee install.out
+RUN echo "export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH" >> /home/$USERNAME/.bashrc
+
+RUN chown -R $USERNAME:$USERNAME /home/$USERNAME
+RUN chown -R $USERNAME:$USERNAME /project
+WORKDIR /project/scripts
+CMD ["/usr/sbin/sshd", "-D"]

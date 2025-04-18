@@ -1,12 +1,27 @@
 name: "Licenta"
 
+x-build-base: &build_base
+    context: .
+    dockerfile: storage_server/dockerfile
+
+x-server_base: &default_storage_server
+  build: *build_base
+
+  cap_add:
+    - NET_ADMIN
+    - SYS_ADMIN
+    - NET_RAW
+  
+  tty: true
+  privileged: true
+
 services:
   #### HEAD SERVER ####
   head_server:
     container_name: head_server
     build:
       context: .
-      dockerfile: head_server/dockerfile
+      dockerfile: ./head_server/dockerfile
     
     cap_add:
       - NET_ADMIN
@@ -16,11 +31,14 @@ services:
     tty: true
     privileged: true
 
+    # command: bash -c "sleep infinity"
+
     networks:
       net:
         ipv4_address: "192.168.1.100"
     
-    command: bash -c "sleep infinity"
+    volumes:
+      - ./head_server/scripts:/project/scripts
 
   #### METADATA SERVER ####
   metadata_server:
@@ -28,7 +46,7 @@ services:
 
     build:
       context: .
-      dockerfile: metadata_server/dockerfile
+      dockerfile: ./metadata_server/dockerfile
     
     cap_add:
       - NET_ADMIN
@@ -37,77 +55,59 @@ services:
     
     tty: true
 
+    command: bash -c "sleep infinity"
+
     networks:
       net:
         ipv4_address: "192.168.1.101"
 
-    command: bash -c "sleep infinity"
+    volumes:
+      - ./metadata_server/scripts:/project/scripts
   
   #### STORAGE SERVERS ####
 
-  #### SERVER 1 ####
-  # server1:
-  #   container_name: server1
-
-  #   build:
-  #     context: .
-  #     dockerfile: storage_server/dockerfile
+  ### SERVER 1 ####
+  server1:
+    <<: *default_storage_server
+    container_name: storage_server1
     
-  #   cap_add:
-  #     - NET_ADMIN
-  #     - SYS_ADMIN
-  #     - NET_RAW
+    build:
+      <<: *build_base
+      args:
+        USERNAME: storage_s1
     
-  #   tty: true
+    networks:
+      net:
+        ipv4_address: "192.168.1.201"
 
-  #   networks:
-  #     net:
-  #       ipv4_address: "192.168.1.201"
+  ### SERVER 2 ####
+  server2:
+    <<: *default_storage_server
+    container_name: storage_server2
+
+    build:
+      <<: *build_base
+      args:
+        USERNAME: storage_s2
+
+    networks:
+      net:
+        ipv4_address: "192.168.1.202"
+
+  #### SERVER 3 ####
+  server3:
+    <<: *default_storage_server
+    container_name: storage_server3
     
-  #   # command: bash -c "/scripts/setup.sh && sleep infinity"
-
-  # #### SERVER 2 ####
-  # server2:
-  #   container_name: server2
+    build:
+      <<: *build_base
+      args:
+        USERNAME: storage_s3
     
-  #   build:
-  #     context: .
-  #     dockerfile: storage_server/dockerfile
-
-  #   cap_add:
-  #     - NET_ADMIN
-  #     - SYS_ADMIN
-  #     - NET_RAW
-    
-  #   tty: true
-
-  #   networks:
-  #     net:
-  #       ipv4_address: "192.168.1.202"
-
-  #   # command: bash -c "/scripts/setup.sh && sleep infinity"
+    networks:
+      net:
+        ipv4_address: "192.168.1.203"
   
-  # #### SERVER 3 ####
-  # server3:
-  #   container_name: server3
-    
-  #   build:
-  #     context: .
-  #     dockerfile: storage_server/dockerfile
-
-  #   cap_add:
-  #     - NET_ADMIN
-  #     - SYS_ADMIN
-  #     - NET_RAW
-    
-  #   tty: true
-
-  #   networks:
-  #     net:
-  #       ipv4_address: "192.168.1.203"
-
-    # command: bash -c "/scripts/setup.sh && sleep infinity"
-    
 #### NETWORKS ####
 networks:
   net: 

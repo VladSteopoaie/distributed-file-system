@@ -1,0 +1,3 @@
+storage_s1@192.168.1.201 slots=1
+storage_s2@192.168.1.202 slots=1
+storage_s3@192.168.1.203 slots=1

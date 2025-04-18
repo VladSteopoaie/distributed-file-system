@@ -6,7 +6,7 @@
 #include <fuse.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include "./lib/cache_client.hpp"
+#include "../lib/cache_client.hpp"
 
 CacheAPI::CacheClient cache_client;
 

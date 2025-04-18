@@ -1,12 +1,58 @@
 FROM ubuntu:latest
 
 RUN mkdir -p /project/lib
+RUN mkdir -p /project/scripts
+RUN mkdir /project/mpi
 
 COPY ./lib /project/lib
-COPY ./head_server /project/
+COPY ./head_server/scripts /project/scripts
+COPY ./mpi /project/mpi
 
 # installing everything
-RUN apt update && apt install -y build-essential net-tools iputils-ping git wget vim memcached meson fuse3 libfuse3-dev libmemcached-tools libmemcached-dev libfmt-dev libprotobuf-dev protobuf-compiler libspdlog-dev
+RUN apt update && apt install -y \ 
+    build-essential net-tools iputils-ping git wget vim \ 
+    meson fuse3 libfuse3-dev memcached libmemcached-tools libmemcached-dev \
+    libfmt-dev libprotobuf-dev protobuf-compiler libspdlog-dev \
+    openssh-client openssh-server zlib1g-dev libpmix2
+
+ARG USERNAME=head_s
+ARG USER_UID=1001
+ARG USER_GID=$USER_UID
+
+WORKDIR /etc/sudoers.d
+
+# Create user and group
+RUN groupadd --gid $USER_GID $USERNAME \
+    && useradd --uid $USER_UID --gid $USER_GID -m -s /bin/bash $USERNAME \
+    # Add sudo support (optional)
+    && echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/$USERNAME \
+    && chmod 0440 /etc/sudoers.d/$USERNAME
+
+# Set the working directory to user's home
+WORKDIR /home/$USERNAME
+RUN mkdir -p /home/$USERNAME/.ssh && chmod 700 /home/$USERNAME/.ssh
+RUN cp /project/mpi/ssh_config /home/$USERNAME/.ssh/config
+
+# SSH keys
+RUN cp /project/mpi/id_rsa /home/$USERNAME/.ssh
+RUN cp /project/mpi/id_rsa.pub /home/$USERNAME/.ssh
+RUN chown $USERNAME:$USERNAME /home/$USERNAME/.ssh/id_rsa
+RUN chmod 600 /home/$USERNAME/.ssh/id_rsa
+RUN cat /home/$USERNAME/.ssh/id_rsa.pub >> /home/$USERNAME/.ssh/authorized_keys && \
+    chmod 600 /home/$USERNAME/.ssh/authorized_keys
+RUN mkdir /var/run/sshd
+EXPOSE 22
+
+# Download OpenMPI
+WORKDIR /project/mpi
+RUN wget https://download.open-mpi.org/release/open-mpi/v5.0/openmpi-5.0.7.tar.gz
+RUN tar xf openmpi-5.0.7.tar.gz
+WORKDIR /project/mpi/openmpi-5.0.7
+
+RUN ./configure 2>&1 | tee config.out
+RUN make all 2>&1 | tee make.out
+RUN make install 2>&1 | tee install.out
+RUN echo "export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH" >> /home/$USERNAME/.bashrc
 
 # ensuring the protofiles are well-generated
 WORKDIR /project/lib
@@ -14,7 +60,7 @@ RUN rm metadata.pb*
 RUN protoc --cpp_out=. metadata.proto
 RUN mv metadata.pb.cc metadata.pb.cpp
 
-# installing ASIO and CLI11
+# installing ASIO, CLI11 and FUSE
 RUN mkdir /stuff
 WORKDIR /stuff
 RUN git clone https://github.com/chriskohlhoff/asio.git
@@ -27,11 +73,9 @@ WORKDIR fuse-3.17.1/build
 RUN meson setup ..
 RUN ninja
 
+RUN chown -R $USERNAME:$USERNAME /home/$USERNAME
+RUN chown -R $USERNAME:$USERNAME /project
+WORKDIR /project/scripts
 # compiling the project
-WORKDIR /project
-RUN make -f Makefile_docker SRC=fs.cpp
-# RUN chmod +x -R ./bin 
-RUN chmod 777 -R .
-
-# adding a user so I don't run the binary as root
-RUN useradd -m -s /bin/bash head_s
+# RUN make -f Makefile_docker SRC=fs.cpp
+CMD ["/usr/sbin/sshd", "-D"]

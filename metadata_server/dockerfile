@@ -1,12 +1,47 @@
 FROM ubuntu:latest
 
 RUN mkdir -p /project/lib
+RUN mkdir -p /project/scripts
+RUN mkdir -p /project/mpi
 
 COPY ./lib /project/lib
-COPY ./metadata_server /project/
+COPY ./metadata_server/scripts /project/scripts
+COPY ./mpi /project/mpi
 
 # installing everything
-RUN apt update && apt install -y build-essential net-tools iputils-ping git wget vim memcached libmemcached-tools libmemcached-dev libfmt-dev libprotobuf-dev protobuf-compiler libspdlog-dev
+RUN apt update && apt install -y \
+    build-essential net-tools iputils-ping git wget vim \
+    memcached libmemcached-tools libmemcached-dev libfmt-dev \
+    libprotobuf-dev protobuf-compiler libspdlog-dev \
+    openssh-client openssh-server
+
+ARG USERNAME=meta_s
+ARG USER_UID=1001
+ARG USER_GID=$USER_UID
+
+WORKDIR /etc/sudoers.d
+
+# Create user and group
+RUN groupadd --gid $USER_GID $USERNAME \
+    && useradd --uid $USER_UID --gid $USER_GID -m -s /bin/bash $USERNAME \
+    # Add sudo support (optional)
+    && echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/$USERNAME \
+    && chmod 0440 /etc/sudoers.d/$USERNAME
+
+# Set the working directory to user's home
+WORKDIR /home/$USERNAME
+RUN mkdir -p /home/$USERNAME/.ssh && chmod 700 /home/$USERNAME/.ssh
+RUN cp /project/mpi/ssh_config /home/$USERNAME/.ssh/config
+
+# SSH keys
+RUN cp /project/mpi/id_rsa /home/$USERNAME/.ssh
+RUN cp /project/mpi/id_rsa.pub /home/$USERNAME/.ssh
+RUN chown $USERNAME:$USERNAME /home/$USERNAME/.ssh/id_rsa
+RUN chmod 600 /home/$USERNAME/.ssh/id_rsa
+RUN cat /home/$USERNAME/.ssh/id_rsa.pub >> /home/$USERNAME/.ssh/authorized_keys && \
+    chmod 600 /home/$USERNAME/.ssh/authorized_keys
+RUN mkdir /var/run/sshd
+EXPOSE 22
 
 # ensuring the protofiles are well-generated
 WORKDIR /project/lib
@@ -24,9 +59,9 @@ RUN wget https://github.com/CLIUtils/CLI11/releases/download/v2.5.0/CLI11.hpp
 RUN cp CLI11.hpp /usr/local/include/
 
 # compiling the project
-WORKDIR /project
-RUN make -f Makefile_docker SRC=test_server.cpp
-RUN chmod +x -R ./bin 
+# WORKDIR /project/scripts
+# RUN make SRC=test_server.cpp
 
-# adding a user so I don't run the binary as root (needed for memcached)
-RUN useradd -m -s /bin/bash meta_s
+RUN chown -R $USERNAME:$USERNAME /home/$USERNAME
+RUN chown -R $USERNAME:$USERNAME /project
+WORKDIR /project/scripts
