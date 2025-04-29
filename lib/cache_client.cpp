@@ -4,44 +4,6 @@ using namespace CacheAPI;
 
 // private
 
-asio::awaitable<void> CacheClient::send_request_async(const CachePacket& request)
-{
-    try {
-        tcp::resolver::results_type endpoints = 
-            co_await resolver.async_resolve(address, port, asio::use_awaitable);
-        
-        co_await asio::async_connect(socket, endpoints, asio::use_awaitable);
-        
-        SPDLOG_DEBUG("Sending packet.");
-        std::vector<uint8_t> buffer;
-        request.to_buffer(buffer);
-
-        co_await asio::async_write(socket, asio::buffer(buffer), asio::use_awaitable);
-    }
-    catch (std::exception& e)
-    {
-        throw std::runtime_error(std::format("send_request_async: {}", e.what()));
-    }
-
-    co_return;
-}
-
-asio::awaitable<void> CacheClient::receive_response_async(CachePacket& response)
-{
-    SPDLOG_DEBUG("Receiving packet.");
-    try {
-        std::vector<uint8_t> buffer(CachePacket::max_packet_size);
-        size_t bytes_received = co_await socket.async_read_some(asio::buffer(buffer), asio::use_awaitable);
-        response.from_buffer(buffer.data(), bytes_received);
-    }
-    catch (std::exception& e)
-    {
-        throw std::runtime_error(std::format("receive_response_async: {}", e.what()));
-    }
-
-    co_return;
-}
-
 std::string CacheClient::get_memcached_object(const std::string& key)
 {
     memcached_return_t error;
@@ -170,10 +132,7 @@ asio::awaitable<std::string> CacheClient::get_async(const std::string& key, bool
             {
                 int error = Utils::get_int_from_byte_array(response.message);
                 SPDLOG_ERROR(std::format("Server error: {}", std::strerror(error)));
-                if (error == 0) error = -1;
-            }
-                // SPDLOG_ERROR(std::format("Server error: {}", Utils::get_string_from_byte_array(response.message)));
-            
+            }            
             co_return "";
         }
         co_return Utils::get_string_from_byte_array(response.value);
@@ -370,9 +329,9 @@ CacheClient::CacheClient()
 {}
 
 CacheClient::CacheClient(const std::string& mem_conf_string)
-    : socket(context)
-    , resolver(context)
-    , mem_conf_string(mem_conf_string)
+    // : socket(context)
+    // , resolver(context)
+    : mem_conf_string(mem_conf_string)
     , mem_client(NULL)
 {}
 
@@ -380,7 +339,6 @@ CacheClient::~CacheClient()
 {
     if (mem_client != NULL)
         memcached_free(mem_client);
-    socket.close();
 }
 
 asio::awaitable<void> CacheClient::connect_async(const std::string& address, const std::string& port)
@@ -437,48 +395,11 @@ asio::awaitable<void> CacheClient::connect_async(const std::string& address, con
     } // try
     catch (std::exception& e)
     {
-        // SPDLOG_ERROR("connect_async: {}", e.what());
         throw std::runtime_error(std::format("connect_async: {}", e.what()));
     }
 
     co_return;
 } // connect_async
-
-void CacheClient::connect(const std::string& address, const std::string& port)
-{
-    std::promise<std::string> result_promise;
-    std::future<std::string> result_future = result_promise.get_future();
-    
-    asio::co_spawn(
-        context, 
-        [&]() -> asio::awaitable<void> {
-            try {
-                co_await connect_async(address, port);
-                result_promise.set_value("");
-            }
-            catch (std::exception& e)
-            {
-                result_promise.set_value(e.what());
-            }
-            co_return;
-        },
-        asio::detached
-    );
-    context.run();
-    context.restart();
-
-    try {
-        std::string result = result_future.get();
-
-        if (result.length() > 0)
-            throw std::runtime_error(result);
-    }
-    catch (std::exception& e)
-    {
-        throw std::runtime_error(e.what());
-    }
-}
-
  
 int CacheClient::set_file(const std::string& key, const std::string& value)
 {

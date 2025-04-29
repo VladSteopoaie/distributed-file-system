@@ -2,7 +2,7 @@
 #define CACHE_SERVER_HPP
 
 #include "cache_connection_handler.hpp"
-#include "server_api.hpp"
+#include "generic_server_api.hpp"
 
 namespace CacheAPI {
     class CacheServer : public GenericServer<CacheConnectionHandler> {

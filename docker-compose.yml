@@ -39,6 +39,7 @@ services:
     
     volumes:
       - ./head_server/scripts:/project/scripts
+      - ./lib:/project/lib
 
   #### METADATA SERVER ####
   metadata_server:
@@ -63,6 +64,7 @@ services:
 
     volumes:
       - ./metadata_server/scripts:/project/scripts
+      - ./lib:/project/lib
   
   #### STORAGE SERVERS ####
 

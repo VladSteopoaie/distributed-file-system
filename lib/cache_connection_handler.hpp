@@ -1,26 +1,19 @@
 #ifndef CACHE_CONNECTION_HANDLER_HPP
 #define CACHE_CONNECTION_HANDLER_HPP
 
-#define ASIO_STANALONE // non-boost version
-#define ASIO_NO_DEPRECATED // no need for deprecated stuff
-#define ASIO_HAS_STD_COROUTINE // c++20 coroutines needed
-#include <asio.hpp>
-#include "cache_protocol.hpp"
+#include "net_protocol.hpp"
+#include "generic_connection_handler.hpp"
 #include "file_mngr.hpp"
 
 
 using asio::ip::tcp;
 
 namespace CacheAPI {
-    class CacheConnectionHandler : public std::enable_shared_from_this<CacheConnectionHandler>
+    class CacheConnectionHandler : public GenericConnectionHandler<CachePacket>
     {
     private:
-        asio::io_context& context;
-        tcp::socket socket;
         memcached_st* mem_client;
         uint16_t mem_port;
-        std::vector<uint8_t> buffer; // buffer to store incoming data
-        // directories paths to store metadata files
         std::string file_metadata_dir;
         std::string dir_metadata_dir;
 
@@ -40,8 +33,6 @@ namespace CacheAPI {
         void remove_memcached_object(const std::string& key);
         asio::awaitable<void> remove_memcached_object_async(const std::string& key);
 
-        void read_socket_async();
-        void write_socket_async();
         void init_connection(CachePacket& response);
 
         void set(const CachePacket& request, CachePacket& response, bool is_file);
@@ -58,10 +49,7 @@ namespace CacheAPI {
             std::string dir_metadata_dir
         );
         
-        ~CacheConnectionHandler();
-
-        tcp::socket& get_socket();
-        void start();
+        ~CacheConnectionHandler() override = default;
     };
 }
 

@@ -2,7 +2,7 @@
 #define FILE_MNGR_HPP
 
 #include "utils.hpp"
-#include "cache_protocol.hpp"
+#include "net_protocol.hpp"
 #include <dirent.h>
 
 namespace FileMngr {

@@ -4,28 +4,11 @@ using namespace CacheAPI;
 
 // public
 CacheConnectionHandler::CacheConnectionHandler(asio::io_context& context, memcached_st* mem_client, uint16_t mem_port, std::string file_metadata_dir, std::string dir_metadata_dir)
-    : context(context)
-    , socket(context)
+    : GenericConnectionHandler<CachePacket>::GenericConnectionHandler(context)
     , mem_client(mem_client)
     , mem_port(mem_port)
     , file_metadata_dir(file_metadata_dir)
-    , dir_metadata_dir(dir_metadata_dir)
-{}
-
-CacheConnectionHandler::~CacheConnectionHandler() {
-    socket.close();
-}
-
-tcp::socket& CacheConnectionHandler::get_socket() { return socket; }
-
-
-void CacheConnectionHandler::start() 
-{
-    tcp::endpoint remote_endpoint =  socket.remote_endpoint();
-    SPDLOG_INFO("New connection from {}:{}.",
-        remote_endpoint.address().to_string(), remote_endpoint.port());
-    read_socket_async();
-}
+    , dir_metadata_dir(dir_metadata_dir) {}
 
 // private
 void CacheConnectionHandler::handle_request(const CachePacket& request, CachePacket& response)
@@ -199,53 +182,6 @@ asio::awaitable<void> CacheConnectionHandler::remove_memcached_object_async(cons
     co_return;
 }
 
-void CacheConnectionHandler::read_socket_async()
-{
-    auto self(shared_from_this()); // used to keep the connection alive
-
-    buffer.resize(CachePacket::max_packet_size);
-    socket.async_read_some(asio::buffer(buffer),
-        [this, self] (std::error_code error, size_t bytes_transferred)
-        {
-            try {
-                if (error)
-                {
-                    throw std::runtime_error(error.message());
-                }
-
-                CachePacket request(buffer.data(), bytes_transferred);
-                
-                CachePacket response;
-                handle_request(request, response);
-
-                response.to_buffer(buffer);
-                self->write_socket_async();
-            }
-            catch (std::exception& e)
-            {
-                SPDLOG_ERROR(std::format("read_socket_async: {}", e.what()));
-            }
-
-        });
-}
-
-void CacheConnectionHandler::write_socket_async()
-{
-    auto self(shared_from_this()); // used to keep the connection alive
-
-    asio::async_write(socket, asio::buffer(buffer),
-        [this, self] (std::error_code error, size_t bytes_transferred)
-        {
-            if (error)
-            {
-                SPDLOG_ERROR(std::format("write_socket_async: {}", error.message()));
-                return;
-            }
-
-            // SPDLOG_INFO("Connection handled successfully!");
-        });
-}
-
 void CacheConnectionHandler::init_connection(CachePacket& response)
 {
     // sending the memcached port if it's set
@@ -325,11 +261,6 @@ void CacheConnectionHandler::get(const CachePacket& request, CachePacket& respon
     catch (std::exception& e)
     {
         throw std::runtime_error(std::format("get: {}", e.what()));
-        // std::string message = std::format("get: {}", e.what());
-        // SPDLOG_ERROR(message);
-        // response.rescode = ResultCode::to_byte(ResultCode::Type::ERRMSG);
-        // response.message_len = 4;
-        // response.message = Utils::get_byte_array_from_int(errno);
     }
 
 } // get
@@ -353,11 +284,6 @@ void CacheConnectionHandler::remove(const CachePacket& request, CachePacket& res
     catch (std::exception& e)
     {
         throw std::runtime_error(std::format("remove: {}", e.what()));
-        // std::string message = std::format("remove: {}", e.what());
-        // SPDLOG_ERROR(message);
-        // response.rescode = ResultCode::to_byte(ResultCode::Type::ERRMSG);
-        // response.message_len = 4;
-        // response.message = Utils::get_byte_array_from_int(errno);
     }
 } // remove
 
@@ -410,10 +336,5 @@ void CacheConnectionHandler::update(const CachePacket& request, CachePacket& res
     catch (std::exception& e)
     {
         throw std::runtime_error(std::format("update: {}", e.what()));
-        // std::string message = std::format("update: {}", e.what());
-        // SPDLOG_ERROR(message);
-        // response.rescode = ResultCode::to_byte(ResultCode::Type::ERRMSG);
-        // response.message_len = 4;
-        // response.message = Utils::get_byte_array_from_int(errno);
     }
 } // update

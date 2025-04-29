@@ -1,5 +1,5 @@
-#ifndef CACHE_PROTOCOL_HPP
-#define CACHE_PROTOCOL_HPP
+#ifndef NET_PROTOCOL_HPP
+#define NET_PROTOCOL_HPP
 
 #include "utils.hpp"
 
@@ -30,7 +30,9 @@ namespace OperationCode {
         SET_DIR = 5,
         RM_FILE = 6,
         RM_DIR = 7,
-        UPDATE = 8
+        UPDATE = 8,
+        READ = 9,
+        WRITE = 10
     };
 
     uint8_t to_byte(Type opcode);
@@ -96,8 +98,11 @@ public:
     void set_u16(size_t pos, uint16_t val);
 };
 
+
 struct CachePacket {
     static const size_t max_packet_size;
+    static const size_t header_size;
+
     // header
     uint16_t id;
     uint8_t opcode;
@@ -119,6 +124,7 @@ struct CachePacket {
     CachePacket();
     CachePacket(const uint8_t* buffer, size_t len);
 
+    static size_t get_packet_size(const uint8_t* buffer, size_t len);
     void from_buffer(const uint8_t* buffer, size_t len);
     size_t to_buffer(std::vector<uint8_t>& buffer) const;
     std::string to_string() const;
@@ -137,4 +143,30 @@ struct UpdateCommand {
     std::string to_string() const;
 };
 
+struct StoragePacket {
+    static const size_t max_packet_size;
+    static const size_t header_size;
+    uint16_t id;
+    uint8_t opcode;
+    uint8_t rescode;
+
+    uint32_t offset; // offset of the chunk being sent
+
+    uint16_t message_len; // messages for additional information
+    uint16_t path_len;
+
+    uint32_t data_len;
+
+    std::vector<uint8_t> path;
+    std::vector<uint8_t> data;
+    std::vector<uint8_t> message;
+
+    StoragePacket();
+    StoragePacket(const uint8_t* buffer, size_t len);
+
+    static size_t get_packet_size(const uint8_t* buffer, size_t len);
+    void from_buffer(const uint8_t* buffer, size_t len);
+    size_t to_buffer(std::vector<uint8_t>& buffer) const;
+    std::string to_string() const;
+};
 #endif

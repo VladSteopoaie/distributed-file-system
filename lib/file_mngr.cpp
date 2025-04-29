@@ -71,7 +71,6 @@ std::string FileMngr::get_local_dir(const std::string& path, const std::string& 
     struct dirent* entry;
     std::ofstream o_file;
 
-
     DIR* dir = opendir(path.c_str());
 
     if (!dir)

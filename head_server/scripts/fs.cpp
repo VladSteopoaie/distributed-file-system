@@ -6,14 +6,17 @@
 #include <fuse.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include "../lib/cache_client.hpp"
+#include "../../lib/cache_client.hpp"
+#include "../../lib/storage_client.hpp"
 
 CacheAPI::CacheClient cache_client;
+StorageAPI::StorageClient storage_client;
 
 struct HostInfo {
-	std::string address, port;
+	std::string storage_address, storage_port;
+	std::string cache_address, cache_port;
 
-	HostInfo() : address(""), port("") {}
+	HostInfo() : storage_address(""), storage_port(""), cache_address(""), cache_port("") {}
 };
 
 
@@ -30,8 +33,8 @@ static int myfs_getattr(const char *path, struct stat *stat_buf, struct fuse_fil
 			return -ENOENT;		
 
 	proto.ParseFromString(proto_str);
+	proto.set_size(8000);
 	Utils::proto_to_struct_stat(proto, stat_buf);
-
 	return 0;
 }
 
@@ -127,13 +130,22 @@ int myfs_release(const char *path, struct fuse_file_info *file_info)
 
 static int myfs_read(const char *path, char *buffer, size_t size, off_t offset, struct fuse_file_info *file_info)
 {
+	std::cout << "Read" << std::endl;
+	std::cout << "Size: " << size << std::endl;
+	std::cout << "Offset: " << offset << std::endl;
 	return 0;
 }
 
 
 static int myfs_write(const char *path, const char *buffer, size_t size, off_t offset, struct fuse_file_info * file_info)
-{           
-	return 0;
+{
+	std::cout << "Write" << std::endl;
+	std::cout << "Size: " << size << std::endl;
+	std::cout << "Offset: " << offset << std::endl;
+
+	std::vector<uint8_t> vec_buffer(buffer, buffer + size);
+
+	return storage_client.write(path, vec_buffer, size, offset);
 }
 
 static int myfs_opendir(const char *path, struct fuse_file_info *file_info) 
@@ -173,11 +185,23 @@ static int myfs_releasedir(const char *path, struct fuse_file_info *file_info)
 static void* myfs_init(struct fuse_conn_info *connection_info, struct fuse_config *config)
 {
 	HostInfo *host_info = (struct HostInfo*) fuse_get_context()->private_data;
-	if (host_info)
-		cache_client.connect(host_info->address, host_info->port);
+	if (host_info->cache_address.length() > 0 && host_info->cache_port.length() > 0)
+	{
+		cache_client.connect(host_info->cache_address, host_info->cache_port);
+	}
 	else
+	{
 		cache_client.connect("127.0.0.1", "8888"); 
-	// storage_servers connection
+	}
+
+	if (host_info->storage_address.length() > 0 && host_info->storage_port.length() > 0)
+	{
+		storage_client.connect(host_info->storage_address, host_info->storage_port);
+	}
+	else
+	{
+		storage_client.connect("127.0.0.1", "7777"); 
+	}
 	return nullptr;
 }
 
@@ -213,8 +237,8 @@ static const struct fuse_operations myfs_oper = {
 	.chmod		= myfs_chmod, 
 	.chown		= myfs_chown, 
 	.open		= myfs_open,
-	// .read		= myfs_read,
-    // .write 	    = myfs_write,
+	.read		= myfs_read,
+    .write 	    = myfs_write,
 	.release	= myfs_release,
 	.opendir	= myfs_opendir,
 	.readdir	= myfs_readdir,
@@ -234,11 +258,11 @@ int main(int argc, char** argv)
 	// Parse command-line arguments
     for (int i = 0; i < argc; ++i) {
         if (strcmp(argv[i], "--address") == 0 && i + 1 < argc) {
-            host_info.address = argv[i + 1];
+            host_info.cache_address = argv[i + 1];
             i++; 
         }
         else if (strcmp(argv[i], "--port") == 0 && i + 1 < argc) {
-            host_info.port = argv[i + 1];
+            host_info.cache_port = argv[i + 1];
             i++; 
         }
 		else {

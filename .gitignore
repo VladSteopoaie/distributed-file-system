@@ -7,3 +7,4 @@ mpi/openmpi*
 mpi/id_rsa*
 TODO
 metadata.pb*
+*.bin

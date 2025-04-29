@@ -1,21 +1,26 @@
 # Compiler and flags
 CXX = g++
-CXXFLAGS = --std=c++20 -I/usr/include/spdlog 
-LDFLAGS = -lfmt -lmemcached -lprotobuf
+CXXFLAGS = --std=c++20 -I/usr/include/fuse3 -I/usr/include/spdlog
+LDFLAGS = -lfmt -lmemcached -lfuse3 -lpthread -lprotobuf
 
-SRC = test2.cpp
+SRC = fs.cpp
 
 # Directories for objects and binary
+ifeq ($(LOCAL), 1)
+OBJDIR = ../../objects
+BINDIR = bin
+SRCDIR = ../../lib
+else
 OBJDIR = ../objects
 BINDIR = bin
 SRCDIR = ../lib
+endif
 
 # Target executable
 TARGET = $(BINDIR)/$(SRC:.cpp=)
 
 # Source files
-SRCS = metadata.pb.cpp utils.cpp cache_protocol.cpp cache_server.cpp cache_client.cpp file_mngr.cpp cache_connection_handler.cpp
-# SRCS = $(SRCFILES:%.cpp=$(SRCDIR)/%.cpp)
+SRCS = net_protocol.cpp cache_client.cpp storage_client.cpp utils.cpp metadata.pb.cpp
 
 # Object files
 OBJS = $(SRCS:%.cpp=$(OBJDIR)/%.o)
@@ -44,3 +49,6 @@ clean:
 	rm -rf $(OBJDIR)
 
 .PHONY: all clean
+
+# hello: hello.c
+# gcc -Wall hello.c -I/usr/include/fuse3 -lfuse3 -lpthread -o hello

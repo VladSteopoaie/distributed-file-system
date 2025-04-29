@@ -1,5 +1,5 @@
-#ifndef SERVER_API_HPP
-#define SERVER_API_HPP
+#ifndef GENERIC_SERVER_API_HPP
+#define GENERIC_SERVER_API_HPP
 
 #define ASIO_STANALONE // non-boost version
 #define ASIO_NO_DEPRECATED // no need for deprecated stuff
