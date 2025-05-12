@@ -4,6 +4,7 @@ RUN mkdir -p /project/lib
 RUN mkdir -p /project/scripts
 RUN mkdir -p /project/mpi
 
+COPY ./metadata_server/setup.sh /project/
 COPY ./lib /project/lib
 COPY ./metadata_server/scripts /project/scripts
 COPY ./mpi /project/mpi
@@ -44,10 +45,10 @@ RUN mkdir /var/run/sshd
 EXPOSE 22
 
 # ensuring the protofiles are well-generated
-WORKDIR /project/lib
-RUN rm metadata.pb*
-RUN protoc --cpp_out=. metadata.proto
-RUN mv metadata.pb.cc metadata.pb.cpp
+# WORKDIR /project/lib
+# RUN rm -rf metadata.pb*
+# RUN protoc --cpp_out=. metadata.proto
+# RUN mv metadata.pb.cc metadata.pb.cpp
 
 # installing ASIO and CLI11
 RUN mkdir /stuff

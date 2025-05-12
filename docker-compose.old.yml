@@ -1,5 +1,20 @@
 name: "Licenta"
+
+x-build-base: &build_base
+    context: .
+    dockerfile: storage_server/dockerfile
+
+x-server_base: &default_storage_server
+  build: *build_base
+
+  cap_add:
+    - NET_ADMIN
+    - SYS_ADMIN
+    - NET_RAW
   
+  tty: true
+  privileged: true
+
 services:
   #### HEAD SERVER ####
   head_server:
@@ -7,8 +22,6 @@ services:
     build:
       context: .
       dockerfile: ./head_server/dockerfile
-    
-    image: shared_image
     
     cap_add:
       - NET_ADMIN
@@ -18,7 +31,7 @@ services:
     tty: true
     privileged: true
 
-    entrypoint: /project/scripts/setup.sh
+    # command: bash -c "sleep infinity"
 
     networks:
       net:
@@ -32,9 +45,18 @@ services:
   metadata_server:
     container_name: metadata_server
 
-    image: shared_image
+    build:
+      context: .
+      dockerfile: ./metadata_server/dockerfile
+    
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - NET_RAW
+    
+    tty: true
 
-    entrypoint: /project/scripts/setup.sh
+    command: bash -c "sleep infinity"
 
     networks:
       net:
@@ -48,53 +70,46 @@ services:
 
   ### SERVER 1 ####
   server1:
+    <<: *default_storage_server
     container_name: storage_server1
     
-    image: shared_image
-    entrypoint: /project/scripts/setup.sh
-    command: storage_s1
-
+    build:
+      <<: *build_base
+      args:
+        USERNAME: storage_s1
+    
     networks:
       net:
         ipv4_address: "192.168.1.201"
 
-    volumes:
-      - ./storage_server/scripts:/project/scripts
-      - ./lib:/project/lib
-    
-
   ### SERVER 2 ####
   server2:
+    <<: *default_storage_server
     container_name: storage_server2
 
-    image: shared_image
-    entrypoint: /project/scripts/setup.sh
-    command: storage_s2
+    build:
+      <<: *build_base
+      args:
+        USERNAME: storage_s2
 
     networks:
       net:
         ipv4_address: "192.168.1.202"
 
-    volumes:
-      - ./storage_server/scripts:/project/scripts
-      - ./lib:/project/lib
-
   #### SERVER 3 ####
   server3:
+    <<: *default_storage_server
     container_name: storage_server3
     
-    volumes:
-      - ./storage_server/scripts:/project/scripts
-      - ./lib:/project/lib
+    build:
+      <<: *build_base
+      args:
+        USERNAME: storage_s3
     
-    image: shared_image
-    entrypoint: /project/scripts/setup.sh
-    command: storage_s3
-  
     networks:
       net:
         ipv4_address: "192.168.1.203"
-
+  
 #### NETWORKS ####
 networks:
   net: 

@@ -134,6 +134,13 @@ std::string Utils::get_parent_dir(std::string path) {
     return path.substr(0, last_slash);
 }
 
+void Utils::trim_trailing_nulls(std::vector<uint8_t>& vec) {
+    auto it = std::find_if(vec.rbegin(), vec.rend(), [](uint8_t byte) {
+        return byte != 0x00;
+    });
+    vec.erase(it.base(), vec.end());
+}
+
 std::vector<uint8_t> Utils::get_byte_array_from_int(uint32_t value)
 {
     std::vector<uint8_t> byte_array = std::vector<uint8_t>(4);
@@ -147,6 +154,22 @@ uint32_t Utils::get_int_from_byte_array(std::vector<uint8_t> byte_array)
     uint32_t value = 0;
     for (int i = 0; i < 4; i ++)
         value += static_cast<uint32_t> (byte_array[i] << ((3 - i) * 8));
+    return value;
+}
+
+std::vector<uint8_t> Utils::get_byte_array_from_int64(uint64_t value)
+{
+    std::vector<uint8_t> byte_array = std::vector<uint8_t>(8);
+    for (int i = 0; i < 8; i ++)
+        byte_array[i] = static_cast<uint8_t>((value >> ((7 - i) * 8))) & 0xFF;
+    return byte_array;
+}
+
+uint64_t Utils::get_int64_from_byte_array(std::vector<uint8_t> byte_array)
+{
+    uint64_t value = 0;
+    for (int i = 0; i < 8; i ++)
+        value += static_cast<uint64_t> (byte_array[i] << ((7 - i) * 8));
     return value;
 }
 

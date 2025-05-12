@@ -34,8 +34,11 @@ namespace Utils
     std::string process_path(std::string path, const std::string& absolute_path);
     std::string get_parent_dir(std::string path);
 
+    void trim_trailing_nulls(std::vector<uint8_t>& vec);
     std::vector<uint8_t> get_byte_array_from_int(uint32_t value);
     uint32_t get_int_from_byte_array(std::vector<uint8_t> byte_array);
+    std::vector<uint8_t> get_byte_array_from_int64(uint64_t value);
+    uint64_t get_int64_from_byte_array(std::vector<uint8_t> byte_array);
     std::vector<uint8_t> get_byte_array_from_string(std::string string); 
     std::string get_string_from_byte_array(std::vector<uint8_t> byte_array);
 }

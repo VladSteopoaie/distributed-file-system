@@ -1,4 +1,4 @@
-#include "../../lib/cache_server.hpp"
+#include "../lib/cache_server.hpp"
 #include <iostream>
 #include <CLI11.hpp>
 

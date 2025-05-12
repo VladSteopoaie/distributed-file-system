@@ -28,6 +28,7 @@ namespace CacheAPI {
     public:
         CacheClient();
         CacheClient(const std::string& mem_conf_file);
+        CacheClient(int thread_count, const std::string& mem_conf_string);
         ~CacheClient() override;
 
         asio::awaitable<void> connect_async(const std::string& address, const std::string& port) override;
@@ -40,6 +41,7 @@ namespace CacheAPI {
         int remove_dir(const std::string& key);
         int chmod(const std::string& key, mode_t new_mode);
         int chown(const std::string& key, uid_t new_uid, gid_t new_gid);
+        int chsize(const std::string& key, off_t new_size);
         int rename(const std::string& old_key, const std::string& new_key);
     };
 }

@@ -18,7 +18,8 @@ namespace FileMngr {
 
     std::string chmod_object(const std::string& path, const std::vector<std::vector<uint8_t>>& argv);
     std::string chown_object(const std::string& path, const std::vector<std::vector<uint8_t>>& argv);
-    std::string rename_object(const std::string& path, const std::string& dir, const std::vector<std::vector<uint8_t>>& argv);
+    std::string chsize_object(const std::string& path, const std::vector<std::vector<uint8_t>>& argv);
+    std::string rename_object(const std::string& path, const std::string& dir, const std::vector<std::vector<uint8_t>>& argv);    
     std::string update_local_object(const std::string& path, const std::string& file_metadata_dir, const std::string& dir_metadata_dir, const UpdateCommand& command, bool is_file);
     std::string update_local_file(const std::string& path, const std::string& file_metadata_dir, const UpdateCommand& command);
     std::string update_local_dir(const std::string& path, const std::string& file_metadata_dir, const std::string& dir_metadata_dir, const UpdateCommand& command);

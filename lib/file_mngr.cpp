@@ -203,6 +203,33 @@ std::string FileMngr::chown_object(const std::string& path, const std::vector<st
 
 }
 
+std::string FileMngr::chsize_object(const std::string& path, const std::vector<std::vector<uint8_t>>& argv)
+{
+    try 
+    {
+        std::string content = get_local_file(path);
+
+        Stat proto;
+        proto.ParseFromString(content);
+        off_t new_size = Utils::get_int64_from_byte_array(argv[0]);
+        proto.set_size(new_size);
+        proto.SerializeToString(&content);
+
+        std::ofstream o_file(path);
+        if (o_file.is_open())
+            o_file << content;
+        else
+            throw std::runtime_error(std::strerror(errno));
+        
+        return content;
+    }
+    catch (std::exception& e)
+    {   
+        throw std::runtime_error(std::format("chmod_object: {}", e.what()));
+    }
+
+}
+
 std::string FileMngr::rename_object(const std::string& path, const std::string& meta_dir, const std::vector<std::vector<uint8_t>>& argv)
 {
     std::string new_path = meta_dir + Utils::get_string_from_byte_array(argv[0]);
@@ -238,8 +265,12 @@ std::string FileMngr::update_local_object(const std::string& path, const std::st
                 if (!is_file)
                     rename_object(path, dir_metadata_dir, command.argv);    
                 break;
+            case UpdateCode::Type::CHSIZE:
+                if (is_file)
+                    content = chsize_object(file_meta, command.argv);
+                break;
             default:
-                throw std::runtime_error("Unknown update command.");
+                throw std::runtime_error(std::format("Unknown update command: {}", command.opcode));
         }
 
         return content;

@@ -3,7 +3,6 @@
 using namespace CacheAPI;
 
 // private
-
 std::string CacheClient::get_memcached_object(const std::string& key)
 {
     memcached_return_t error;
@@ -33,8 +32,7 @@ asio::awaitable<int> CacheClient::set_async(const std::string& key, const std::s
         request.value_len = value.length();
         request.key = Utils::get_byte_array_from_string(key);
         request.value = Utils::get_byte_array_from_string(value);
-        co_await send_request_async(request);
-        co_await receive_response_async(response);
+        co_await send_request_async(request, response);
             
         if ((response.id != request.id) || response.rescode == ResultCode::Type::ERRMSG)
         {
@@ -86,8 +84,8 @@ int CacheClient::set(const std::string& key, const std::string& value, uint32_t 
         asio::detached
     );
 
-    context.run();
-    context.restart();
+    // context.run();
+    // context.restart();
 
     try {
         return result_future.get();
@@ -121,8 +119,7 @@ asio::awaitable<std::string> CacheClient::get_async(const std::string& key, bool
         request.key_len = key.length();
         request.key = Utils::get_byte_array_from_string(key);
 
-        co_await send_request_async(request);
-        co_await receive_response_async(response);
+        co_await send_request_async(request, response);
 
         if ((response.id != request.id) || response.rescode == ResultCode::Type::ERRMSG)
         {
@@ -160,8 +157,8 @@ std::string CacheClient::get(const std::string& key, bool is_file)
         asio::detached
     );
 
-    context.run();
-    context.restart();
+    // context.run();
+    // context.restart();
 
     try {
         return result_future.get();
@@ -183,8 +180,7 @@ asio::awaitable<int> CacheClient::remove_async(const std::string& key, bool is_f
             request.opcode = OperationCode::to_byte(OperationCode::Type::RM_DIR);
         request.key_len = key.length();
         request.key = Utils::get_byte_array_from_string(key);
-        co_await send_request_async(request);
-        co_await receive_response_async(response);
+        co_await send_request_async(request, response);
             
         if ((response.id != request.id) || response.rescode == ResultCode::Type::ERRMSG)
         {
@@ -235,8 +231,8 @@ int CacheClient::remove(const std::string& key, bool is_file)
         asio::detached
     );
 
-    context.run();
-    context.restart();
+    // context.run();
+    // context.restart();
 
     try {
         return result_future.get();
@@ -258,8 +254,8 @@ asio::awaitable<int> CacheClient::update_async(const std::string& key, const Upd
         command.to_buffer(request.value);
         request.value_len = request.value.size();
 
-        co_await send_request_async(request);
-        co_await receive_response_async(response);
+        co_await send_request_async(request, response);
+        // co_await receive_onse_anc(response);
             
         if ((response.id != request.id) || response.rescode == ResultCode::Type::ERRMSG)
         {
@@ -310,8 +306,8 @@ int CacheClient::update(const std::string& key, const UpdateCommand& command)
         asio::detached
     );
 
-    context.run();
-    context.restart();
+    // context.run();
+    // context.restart();
 
     try {
         return result_future.get();
@@ -325,15 +321,21 @@ int CacheClient::update(const std::string& key, const UpdateCommand& command)
 
 // public
 CacheClient::CacheClient()
-    : CacheClient("")
+    : CacheClient(1, "")
 {}
 
 CacheClient::CacheClient(const std::string& mem_conf_string)
-    // : socket(context)
-    // , resolver(context)
-    : mem_conf_string(mem_conf_string)
-    , mem_client(NULL)
+    : CacheClient(1, mem_conf_string)
 {}
+
+CacheClient::CacheClient(int thread_count, const std::string& mem_conf_string)
+    : GenericClient<CachePacket>(thread_count)
+    , mem_conf_string(mem_conf_string)
+    , mem_client(NULL)
+{
+    SPDLOG_INFO("CacheClient:\n\t- memcached config: {}\n\t- thread count: {}", mem_conf_string, thread_count);
+}
+
 
 CacheClient::~CacheClient()
 {
@@ -353,8 +355,8 @@ asio::awaitable<void> CacheClient::connect_async(const std::string& address, con
             request.id = Utils::generate_id();
             request.opcode = OperationCode::to_byte(OperationCode::Type::INIT);
 
-            co_await send_request_async(request);
-            co_await receive_response_async(response);
+            co_await send_request_async(request, response);
+            // co_await receie_response_async(response);
             
             if (request.id != response.id || response.id == 0)
             {
@@ -447,6 +449,15 @@ int CacheClient::chown(const std::string& key, uid_t new_uid, gid_t new_gid)
     command.argv.push_back(Utils::get_byte_array_from_int(new_uid));
     command.argv.push_back(Utils::get_byte_array_from_int(new_gid));
     command.argc = 2;
+    return update(key, command);
+}
+
+int CacheClient::chsize(const std::string& key, off_t new_size)
+{
+    UpdateCommand command;
+    command.opcode = UpdateCode::to_byte(UpdateCode::Type::CHSIZE);
+    command.argv.push_back(Utils::get_byte_array_from_int64(new_size));
+    command.argc = 1;
     return update(key, command);
 }
 

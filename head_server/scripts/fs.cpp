@@ -6,11 +6,11 @@
 #include <fuse.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include "../../lib/cache_client.hpp"
-#include "../../lib/storage_client.hpp"
+#include "../lib/cache_client.hpp"
+#include "../lib/storage_client.hpp"
 
 CacheAPI::CacheClient cache_client;
-StorageAPI::StorageClient storage_client;
+StorageAPI::StorageClient storage_client(128 * 1024);
 
 struct HostInfo {
 	std::string storage_address, storage_port;
@@ -33,7 +33,6 @@ static int myfs_getattr(const char *path, struct stat *stat_buf, struct fuse_fil
 			return -ENOENT;		
 
 	proto.ParseFromString(proto_str);
-	proto.set_size(8000);
 	Utils::proto_to_struct_stat(proto, stat_buf);
 	return 0;
 }
@@ -52,14 +51,15 @@ static int myfs_mkdir(const char *path, mode_t mode)
 
 static int myfs_unlink(const char *path)
 {
-	int error = cache_client.remove_file(path);
-
-	if (error < 0)
+	// not a perfect error handling, but good enough for now
+	int error_cache = cache_client.remove_file(path);
+	int error_storage = storage_client.remove(path);
+	if (error_cache < 0 && error_storage < 0)
 	{
 		return -EIO;
 	}
 
-	return -error;
+	return 0;
 }
 
 static int myfs_rmdir(const char *path)
@@ -72,7 +72,6 @@ static int myfs_rmdir(const char *path)
 	}
 
 	return -error;
-
 }
 
 static int myfs_rename(const char *old_path, const char *new_path, unsigned int flags)
@@ -133,9 +132,10 @@ static int myfs_read(const char *path, char *buffer, size_t size, off_t offset, 
 	std::cout << "Read" << std::endl;
 	std::cout << "Size: " << size << std::endl;
 	std::cout << "Offset: " << offset << std::endl;
-	return 0;
+	size_t r_size = storage_client.read(path, buffer, size, offset);	
+	// std::cout << "Request offset: " << offset << " received: " << r_size << std::endl;
+	return r_size;
 }
-
 
 static int myfs_write(const char *path, const char *buffer, size_t size, off_t offset, struct fuse_file_info * file_info)
 {
@@ -143,9 +143,13 @@ static int myfs_write(const char *path, const char *buffer, size_t size, off_t o
 	std::cout << "Size: " << size << std::endl;
 	std::cout << "Offset: " << offset << std::endl;
 
-	std::vector<uint8_t> vec_buffer(buffer, buffer + size);
+	// std::vector<uint8_t> vec_buffer(buffer, buffer + size);
 
-	return storage_client.write(path, vec_buffer, size, offset);
+	// return storage_client.write_stripes(path, vec_buffer, size, offset);
+	int nbytes = storage_client.write(path, buffer, size, offset);
+	std::cout << nbytes << std::endl;
+	cache_client.chsize(path, offset + (off_t) nbytes);
+	return nbytes;
 }
 
 static int myfs_opendir(const char *path, struct fuse_file_info *file_info) 
@@ -184,6 +188,9 @@ static int myfs_releasedir(const char *path, struct fuse_file_info *file_info)
 
 static void* myfs_init(struct fuse_conn_info *connection_info, struct fuse_config *config)
 {
+	// connection_info->max_write = 1024 * 128;
+    // connection_info->max_read  = 1024 * 128;
+
 	HostInfo *host_info = (struct HostInfo*) fuse_get_context()->private_data;
 	if (host_info->cache_address.length() > 0 && host_info->cache_port.length() > 0)
 	{
@@ -200,7 +207,7 @@ static void* myfs_init(struct fuse_conn_info *connection_info, struct fuse_confi
 	}
 	else
 	{
-		storage_client.connect("127.0.0.1", "7777"); 
+		storage_client.connect("127.0.0.1", "13337"); 
 	}
 	return nullptr;
 }

@@ -47,15 +47,15 @@ protected:
                         if (!expected_size)
                             expected_size = Packet::get_packet_size(packet_buffer.data(), packet_buffer.size());
 
-                        SPDLOG_INFO("transfered: {}", bytes_transferred);
-                        SPDLOG_INFO("current size: {}", packet_buffer.size());
-                        SPDLOG_INFO("expected: {}", expected_size);
-                        
+                        // SPDLOG_INFO("transfered: {}", bytes_transferred);
+                        // SPDLOG_INFO("current size: {}", packet_buffer.size());
+                        // SPDLOG_INFO("expected: {}", expected_size);
+
                         if (packet_buffer.size() < expected_size)
                             break;
                         
                         Packet request(packet_buffer.data(), packet_buffer.size());
-
+                        // std::cout << request.to_string() << std::endl;
                         Packet response;
                         handle_request(request, response);
 

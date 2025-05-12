@@ -16,46 +16,88 @@ using asio::ip::tcp;
 
 template <typename Packet>
 class GenericClient {
+private:
+
+asio::awaitable<size_t> read_socket(tcp::socket& socket, Packet& response)
+{
+    try {
+            std::vector<uint8_t> buffer;
+            buffer.resize(64 * 1024); // buffer to store incoming data
+            std::vector<uint8_t> packet_buffer;
+            packet_buffer.reserve(Packet::max_packet_size);
+            
+            size_t expected_size = 0;
+            size_t bytes_transferred;
+            while (true)
+            {
+                // if (expected_size > 0)
+                    // std::cout << "Should expect: " << expected_size - packet_buffer.size() << " bytes" << std::endl; 
+                bytes_transferred = co_await socket.async_read_some(asio::buffer(buffer), asio::use_awaitable);
+                packet_buffer.insert(packet_buffer.end(), buffer.begin(), buffer.begin() + bytes_transferred);
+                
+                if (packet_buffer.size() < Packet::header_size)
+                continue;
+                
+                if (!expected_size)
+                expected_size = Packet::get_packet_size(packet_buffer.data(), packet_buffer.size());
+                
+                // std::cout << "Packet size: " << packet_buffer.size() << std::endl;
+                // std::cout << "Header size: " << Packet::header_size << std::endl;
+                // std::cout << "Expected size: " << expected_size << std::endl;
+                if (packet_buffer.size() < expected_size)
+                    continue;
+                    
+                    // co_return packet_buffer.size();
+                    break;
+                }
+                
+                response.from_buffer(packet_buffer.data(), packet_buffer.size());
+                co_return packet_buffer.size();
+                
+            }
+            catch (std::exception& e)
+            {
+                throw std::runtime_error(std::format("read_socket: {}", e.what()));
+            }
+            
+            co_return 0;
+        }
+        
 protected:
+    int thread_count;
     asio::io_context context;
-    tcp::socket socket;
     tcp::resolver resolver;
     std::string address;
     std::string port;
-
-    asio::awaitable<void> send_request_async(const Packet& request)
+    std::vector<std::thread> thread_pool; 
+    asio::executor_work_guard<asio::io_context::executor_type> work_guard;
+        
+    asio::awaitable<void> send_request_async(const Packet& request, Packet& response)
     {
+        tcp::socket socket = tcp::socket(context);
         try {
+            std::vector<uint8_t> buffer; // buffer to store incoming data
             tcp::resolver::results_type endpoints = 
                 co_await resolver.async_resolve(address, port, asio::use_awaitable);
-            
             co_await asio::async_connect(socket, endpoints, asio::use_awaitable);
             
-            SPDLOG_DEBUG("Sending packet.");
-            std::vector<uint8_t> buffer;
             request.to_buffer(buffer);
-
             co_await asio::async_write(socket, asio::buffer(buffer), asio::use_awaitable);
+            
+            size_t bytes_received = co_await read_socket(socket, response);
+            // socket.async_read_some(asio::buffer(buffer),
+            //     [this, self] (std::error_code error, size_t bytes_transferred)
+            //     {
+
+            //     });
+            // std::cout << Packet::max_packet_size << " vs. " << bytes_received << " vs. " << packet_buffer.size() << std::endl;
+            // response.from_buffer(packet_buffer.data(), bytes_received);
+            socket.close();
         }
         catch (std::exception& e)
         {
+            socket.close();
             throw std::runtime_error(std::format("send_request_async: {}", e.what()));
-        }
-
-        co_return;
-    }
-
-    asio::awaitable<void> receive_response_async(Packet& response)
-    {
-        SPDLOG_DEBUG("Receiving packet.");
-        try {
-            std::vector<uint8_t> buffer(Packet::max_packet_size);
-            size_t bytes_received = co_await socket.async_read_some(asio::buffer(buffer), asio::use_awaitable);
-            response.from_buffer(buffer.data(), bytes_received);
-        }
-        catch (std::exception& e)
-        {
-            throw std::runtime_error(std::format("receive_response_async: {}", e.what()));
         }
 
         co_return;
@@ -65,11 +107,34 @@ public:
     GenericClient(const GenericClient&) = delete;
     GenericClient& operator= (const GenericClient&) = delete;
 
-    GenericClient()
-        : socket(context)
-        , resolver(context) 
-    {}
-    virtual ~GenericClient() { socket.close(); }
+    GenericClient() : GenericClient(1) {} // default thread count 1
+    GenericClient(int thread_count)
+        : resolver(context) 
+        , work_guard(asio::make_work_guard(context))
+        , thread_count(thread_count)
+    {
+        for (int i = 0; i < thread_count; i++)
+        {
+            thread_pool.emplace_back([this]() {
+                try {
+                    context.run();
+                }
+                catch (std::exception& e)
+                {
+                    SPDLOG_ERROR("Thread error: {}", e.what());
+                }
+            });
+        }
+    }
+
+    virtual ~GenericClient() { 
+        context.stop();
+        for (auto& t : thread_pool)
+        {
+            if (t.joinable())
+                t.join();
+        }
+    }
 
     virtual asio::awaitable<void> connect_async(const std::string& address, const std::string& port)
     {
@@ -81,8 +146,7 @@ public:
             Packet request, response;
             request.id = Utils::generate_id();
             request.opcode = OperationCode::to_byte(OperationCode::Type::INIT);
-            co_await send_request_async(request);
-            co_await receive_response_async(response);
+            co_await send_request_async(request, response);
 
             if (request.id != response.id || response.id == 0)
             {
@@ -126,11 +190,13 @@ public:
             },
             asio::detached
         );
-        context.run();
-        context.restart();
+        // context.run();
+        // context.restart();
 
         try {
+            // std::cout << "Waiting for connect result..." << std::endl;
             std::string result = result_future.get();
+            // std::cout << "Result: " << result << std::endl;
 
             if (result.length() > 0)
                 throw std::runtime_error(result);

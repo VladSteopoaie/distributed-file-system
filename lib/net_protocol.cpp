@@ -172,6 +172,8 @@ uint8_t UpdateCode::to_byte(Type opcode)
             return 2;
         case Type::RENAME:
             return 3;
+        case Type::CHSIZE:
+            return 4;
         
         default:
             return -1;
@@ -188,6 +190,8 @@ UpdateCode::Type UpdateCode::from_byte(uint8_t byte)
             return Type::CHOWN;
         case 3:
             return Type::RENAME;
+        case 4:
+            return Type::CHSIZE;
         
         default:
             return Type::UNKNOWN;
@@ -204,6 +208,8 @@ std::string UpdateCode::to_string(UpdateCode::Type opcode)
             return "CHOWN";
         case Type::RENAME:
             return "RENAME";
+        case Type::CHSIZE:
+            return "CHSIZE";
 
         default:
             return "UNKNOWN";
@@ -244,7 +250,7 @@ size_t BytePacketBuffer::get_size() const
     return buffer.size();
 }
 
-std::vector<uint8_t> BytePacketBuffer::get_buffer() const
+std::vector<uint8_t>& BytePacketBuffer::get_buffer()
 {
     return buffer;
 }
@@ -309,7 +315,7 @@ uint16_t BytePacketBuffer::read_u16()
     try {
         rez = (uint16_t) read_u8() << 8;
         rez += (uint16_t) read_u8();
-    } catch (std::runtime_error e) {
+    } catch (std::runtime_error& e) {
         throw std::runtime_error(std::format("read_u16: {}", e.what()));
     }
 
@@ -323,7 +329,7 @@ uint32_t BytePacketBuffer::read_u32()
     try{
         rez = (uint32_t) read_u16() << 16;
         rez += (uint32_t) read_u16();
-    } catch (std::runtime_error e)
+    } catch (std::runtime_error& e)
     {
         throw std::runtime_error(std::format("read_u32: {}", e.what()));
     }
@@ -496,7 +502,8 @@ size_t CachePacket::to_buffer(std::vector<uint8_t>& final_buffer) const
     for (size_t i = 0; i < value_len; i ++)
         packet_buffer.write_u8(value[i]);
 
-    final_buffer = packet_buffer.get_buffer();
+    std::copy(packet_buffer.get_buffer().begin(), packet_buffer.get_buffer().end(), final_buffer.begin());
+
     return packet_buffer.get_size();
 }
 
@@ -578,6 +585,7 @@ size_t UpdateCommand::to_buffer(std::vector<uint8_t>& final_buffer) const
             command_buffer.write_u8(arg[i]);
     }
 
+    // std::copy(command_buffer.get_buffer().begin(), command_buffer.get_buffer().end(), final_buffer.begin());
     final_buffer = command_buffer.get_buffer();
     return command_size;
 }
@@ -601,7 +609,7 @@ std::string UpdateCommand::to_string() const
 /*###################################*/
 
 const size_t StoragePacket::header_size = 16;
-// 256KB is the fuze chunk size for read/writes operations on my system
+// 128KB is the fuze chunk size for read/writes operations on my system
 // 4B for the header
 // 1KB for path length
 const size_t StoragePacket::max_packet_size = 256 * 1024 + StoragePacket::header_size + 1024;
@@ -664,14 +672,17 @@ void StoragePacket::from_buffer(const uint8_t* buffer, size_t len)
         data_len = packet_buffer.read_u32();
 
         path.resize(path_len);
+        // std::cout << "path_len: " << path_len << std::endl;
         for (size_t i = 0; i < path_len; i ++)
             path[i] = packet_buffer.read_u8();
 
         data.resize(data_len);
+        // std::cout << "data_len: " << data_len << std::endl;
         for (size_t i = 0; i < data_len; i ++)
             data[i] = packet_buffer.read_u8();
 
         message.resize(message_len);
+        // std::cout << "message_len: " << message_len << std::endl;
         for (size_t i = 0; i < message_len; i ++)
             message[i] = packet_buffer.read_u8();
     }
@@ -709,8 +720,42 @@ size_t StoragePacket::to_buffer(std::vector<uint8_t>& final_buffer) const
     for (size_t i = 0; i < message_len; i ++)
         packet_buffer.write_u8(message[i]);
 
-    final_buffer = packet_buffer.get_buffer();
+    std::copy(packet_buffer.get_buffer().begin(), packet_buffer.get_buffer().end(), final_buffer.begin());
     return packet_buffer.get_size();
+}
+
+size_t StoragePacket::to_buffer_no_resize(std::vector<uint8_t>& final_buffer) const
+{
+    BytePacketBuffer packet_buffer = BytePacketBuffer();
+    
+    size_t bytes_returned = header_size + path_len + data_len + message_len; // header length + data length 
+    packet_buffer.resize(bytes_returned);
+    // final_buffer.resize(bytes_returned);
+    if (final_buffer.size() < bytes_returned)
+    throw std::runtime_error(std::format("to_buffer_no_resize: Buffer too small. Length given: {}, buffer size: {}", bytes_returned, final_buffer.size()));
+    
+    packet_buffer.write_u16(id);
+    packet_buffer.write_u8(opcode);
+    packet_buffer.write_u8(rescode);
+    
+    packet_buffer.write_u32(offset);
+    
+    packet_buffer.write_u16(message_len);
+    packet_buffer.write_u16(path_len);
+    
+    packet_buffer.write_u32(data_len);
+    
+    for (size_t i = 0; i < path_len; i ++)
+    packet_buffer.write_u8(path[i]);
+    
+    for (size_t i = 0; i < data_len; i ++)
+    packet_buffer.write_u8(data[i]);
+    
+    for (size_t i = 0; i < message_len; i ++)
+    packet_buffer.write_u8(message[i]);
+    
+    std::copy(packet_buffer.get_buffer().begin(), packet_buffer.get_buffer().end(), final_buffer.begin());
+    return bytes_returned;
 }
 
 std::string StoragePacket::to_string() const

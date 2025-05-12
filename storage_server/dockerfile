@@ -2,6 +2,9 @@ FROM ubuntu:latest
 
 RUN mkdir -p /project/mpi
 RUN mkdir -p /project/scripts
+RUN mkdir -p /project/storage
+
+COPY ./storage_server/setup.sh /project/
 COPY ./storage_server/scripts /project/scripts
 COPY ./mpi /project/mpi
 
@@ -52,4 +55,4 @@ RUN echo "export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH" >> /home/$USER
 RUN chown -R $USERNAME:$USERNAME /home/$USERNAME
 RUN chown -R $USERNAME:$USERNAME /project
 WORKDIR /project/scripts
-CMD ["/usr/sbin/sshd", "-D"]
+# CMD ["/usr/sbin/sshd", "-D"]

@@ -46,6 +46,7 @@ namespace UpdateCode {
         CHMOD = 1,
         CHOWN = 2,
         RENAME = 3,
+        CHSIZE = 4,
     };
 
     uint8_t to_byte(Type opcode);
@@ -68,7 +69,7 @@ public:
     // resizes the buffer and moves c_pos at the beggining  
     void resize(size_t len);
     size_t get_size() const;
-    std::vector<uint8_t> get_buffer() const;
+    std::vector<uint8_t>& get_buffer();
 
     size_t get_position() const;
 
@@ -167,6 +168,7 @@ struct StoragePacket {
     static size_t get_packet_size(const uint8_t* buffer, size_t len);
     void from_buffer(const uint8_t* buffer, size_t len);
     size_t to_buffer(std::vector<uint8_t>& buffer) const;
+    size_t to_buffer_no_resize(std::vector<uint8_t>& final_buffer) const;
     std::string to_string() const;
 };
 #endif
