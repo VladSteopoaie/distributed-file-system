@@ -36,10 +36,10 @@ asio::awaitable<size_t> read_socket(tcp::socket& socket, Packet& response)
                 packet_buffer.insert(packet_buffer.end(), buffer.begin(), buffer.begin() + bytes_transferred);
                 
                 if (packet_buffer.size() < Packet::header_size)
-                continue;
+                    continue;
                 
                 if (!expected_size)
-                expected_size = Packet::get_packet_size(packet_buffer.data(), packet_buffer.size());
+                    expected_size = Packet::get_packet_size(packet_buffer.data(), packet_buffer.size());
                 
                 // std::cout << "Packet size: " << packet_buffer.size() << std::endl;
                 // std::cout << "Header size: " << Packet::header_size << std::endl;

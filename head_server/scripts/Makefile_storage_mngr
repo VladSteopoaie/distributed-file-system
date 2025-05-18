@@ -20,7 +20,7 @@ endif
 TARGET = $(BINDIR)/$(SRC:.cpp=)
 
 # Source files
-SRCS = metadata.pb.cpp utils.cpp net_protocol.cpp storage_server.cpp storage_client.cpp file_mngr.cpp storage_connection_handler.cpp
+SRCS = metadata.pb.cpp utils.cpp net_protocol.cpp storage_server.cpp file_mngr.cpp storage_connection_handler.cpp
 # SRCS = $(SRCFILES:%.cpp=$(SRCDIR)/%.cpp)
 
 # Object files

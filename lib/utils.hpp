@@ -9,6 +9,7 @@
 #include <cstring>
 #include <cstdint>
 #include <cstdlib>
+#include <chrono>
 #include <fstream>
 #include <format>
 #include <fcntl.h>
@@ -41,6 +42,27 @@ namespace Utils
     uint64_t get_int64_from_byte_array(std::vector<uint8_t> byte_array);
     std::vector<uint8_t> get_byte_array_from_string(std::string string); 
     std::string get_string_from_byte_array(std::vector<uint8_t> byte_array);
+
+    class PerformanceTimer {
+    private:
+        std::chrono::time_point<std::chrono::high_resolution_clock> start_time;
+        std::string operation_name;
+        std::ofstream& log_file;
+
+    public:
+        PerformanceTimer(const std::string& name, std::ofstream& file) 
+            : operation_name(name), log_file(file) {
+            // log_file.open(file, std::ios::app);
+            start_time = std::chrono::high_resolution_clock::now();
+        }
+
+        ~PerformanceTimer() {
+            auto endTime = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - start_time).count();
+            log_file << operation_name << ": " << duration << " microseconds\n";
+            log_file.flush();
+        }
+    };
 }
 
 #endif

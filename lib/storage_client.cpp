@@ -2,6 +2,8 @@
 
 using namespace StorageAPI;
 
+std::ofstream s_log_file("/mnt/tmpfs/s_client.log", std::ios::app);
+
 // private
 asio::awaitable<int> StorageClient::read_async(const std::string& path, char* buffer, size_t size, off_t offset)
 {
@@ -15,8 +17,9 @@ asio::awaitable<int> StorageClient::read_async(const std::string& path, char* bu
         request.path = Utils::get_byte_array_from_string(path);
         request.data_len = 4;
         request.data = Utils::get_byte_array_from_int(size);
+        
         co_await send_request_async(request, response);
-
+ 
         if ((response.id != request.id) || response.rescode == ResultCode::Type::ERRMSG)
         {
             if (response.message_len == 0)
@@ -57,7 +60,10 @@ asio::awaitable<int> StorageClient::write_async(
         request.path = Utils::get_byte_array_from_string(path);
         request.data_len = size;
         request.data.assign(buffer, buffer + size);
-        co_await send_request_async(request, response);
+        {
+            Utils::PerformanceTimer timer("StorageClient::read_async", s_log_file);
+            co_await send_request_async(request, response);
+        }
         // std::cout << response.to_string() << std::endl;
         if ((response.id != request.id) || response.rescode == ResultCode::Type::ERRMSG)
         {

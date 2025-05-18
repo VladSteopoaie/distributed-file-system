@@ -1,7 +1,7 @@
-#define ASIO_STANALONE // non-boost version
-#define ASIO_NO_DEPRECATED // no need for deprecated stuff
-#define ASIO_HAS_STD_COROUTINE // c++20 coroutines needed
-#include <asio.hpp>
+// #define ASIO_STANALONE // non-boost version
+// #define ASIO_NO_DEPRECATED // no need for deprecated stuff
+// #define ASIO_HAS_STD_COROUTINE // c++20 coroutines needed
+// #include <asio.hpp>
 #include <mpi.h>
 #include <iostream>
 #include <thread>
@@ -9,10 +9,11 @@
 #include <csignal>
 #include "../lib/net_protocol.hpp"
 
-asio::io_context context;
+// asio::io_context context;
 std::string storage_path = "/project/storage";
 int master_rank = 0, rank, thread_count = 4;
 int stripe_size;
+std::ofstream log_file;
 
 void init()
 {
@@ -21,12 +22,14 @@ void init()
     std::cout << rank << ": Connected to master with rank " << master_rank << std::endl;
     MPI_Recv(&stripe_size, 1, MPI_INT, master_rank, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     std::cout << "Received stripe_size: " << stripe_size << std::endl;
+    log_file.open("/mnt/tmpfs/storage" + std::to_string(rank) + ".log", std::ios::app);
 }
 
 int write(const StoragePacket& request)
 {
     std::string stripe_path = storage_path + Utils::get_string_from_byte_array(request.path) + "#" + std::to_string(request.offset);
     // std::cout << rank << ": path " << stripe_path << std::endl;
+    Utils::PerformanceTimer timer("Slave handle_task", log_file);
     int fd = open(stripe_path.c_str(), O_CREAT | O_RDWR, 0666);
     if (fd < 0) {
         close(fd);
@@ -78,7 +81,8 @@ int remove(const StoragePacket& request)
     return err;
 }
 
-asio::awaitable<void> handle_task(uint8_t* data, int data_size, int tag) {
+// asio::awaitable<void> handle_task(uint8_t* data, int data_size, int tag) {
+void handle_task(uint8_t* data, int data_size, int tag) {
     int result;
     StoragePacket response, request, node_response;
     int err;
@@ -129,20 +133,23 @@ asio::awaitable<void> handle_task(uint8_t* data, int data_size, int tag) {
             }
             node_response.to_buffer(node_data); // reusing node_data vector
             MPI_Send(node_data.data(), node_data.size(), MPI_UNSIGNED_CHAR, master_rank, tag, MPI_COMM_WORLD);
-            co_return;
+            // co_return;
+            return;
             break;
     }
     MPI_Send(&result, 1, MPI_INT, master_rank, tag, MPI_COMM_WORLD);
     
     // std::cout << rank << ": Sent " << result << " for offset " << request.offset << "\n";
-    co_return;
+    // co_return;
+    return;
 }
 
 void listener_thread_func() {
     MPI_Status status;
     int data_size;
 
-    while (!context.stopped()) {
+    // while (!context.stopped()) {
+    while (true) {
         MPI_Probe(master_rank, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 
         MPI_Get_count(&status, MPI_UNSIGNED_CHAR, &data_size);
@@ -151,9 +158,10 @@ void listener_thread_func() {
         uint8_t *data = (uint8_t*) malloc(data_size);
         MPI_Recv(data, data_size, MPI_UNSIGNED_CHAR, master_rank, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-        asio::post(context, [data, data_size, tag]() {
-            asio::co_spawn(context, handle_task(data, data_size, tag), asio::detached);
-        });
+        // asio::post(context, [data, data_size, tag]() {
+        //     asio::co_spawn(context, handle_task(data, data_size, tag), asio::detached);
+        // });
+        handle_task(data, data_size, tag);
     }
 }
 
@@ -168,26 +176,26 @@ int main(int argc, char** argv) {
 
     init();
 
-    asio::signal_set signals(context, SIGINT, SIGTERM);
-    signals.async_wait([](const std::error_code&, int) {
-        context.stop();
-    });
+    // asio::signal_set signals(context, SIGINT, SIGTERM);
+    // signals.async_wait([](const std::error_code&, int) {
+    //     context.stop();
+    // });
 
-    std::thread listener_thread(listener_thread_func);
+    // std::thread listener_thread(listener_thread_func);
 
-    std::vector<std::thread> thread_pool;
-    for (int i = 0; i < thread_count - 2; i ++) // one thread is the listener and one is main thread
-        thread_pool.emplace_back([&]() { context.run(); });
+    // std::vector<std::thread> thread_pool;
+    // for (int i = 0; i < thread_count - 2; i ++) // one thread is the listener and one is main thread
+    //     thread_pool.emplace_back([&]() { context.run(); });
 
-    context.run();
+    // context.run();
 
-    for (auto& t : thread_pool)
-    {
-        if (t.joinable())
-            t.join();
-    }
-
-    listener_thread.join();
+    // for (auto& t : thread_pool)
+    // {
+    //     if (t.joinable())
+    //         t.join();
+    // }
+    listener_thread_func();
+    // listener_thread.join();
     MPI_Finalize();
     return 0;
 }

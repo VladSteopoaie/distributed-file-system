@@ -11,6 +11,7 @@
 
 CacheAPI::CacheClient cache_client;
 StorageAPI::StorageClient storage_client(128 * 1024);
+std::ofstream log_file("/mnt/tmpfs/fs.log", std::ios::app);
 
 struct HostInfo {
 	std::string storage_address, storage_port;
@@ -146,7 +147,11 @@ static int myfs_write(const char *path, const char *buffer, size_t size, off_t o
 	// std::vector<uint8_t> vec_buffer(buffer, buffer + size);
 
 	// return storage_client.write_stripes(path, vec_buffer, size, offset);
-	int nbytes = storage_client.write(path, buffer, size, offset);
+	int nbytes;
+	{
+		Utils::PerformanceTimer timer("Storage Client Write:", log_file);
+		nbytes = storage_client.write(path, buffer, size, offset);
+	}
 	std::cout << nbytes << std::endl;
 	cache_client.chsize(path, offset + (off_t) nbytes);
 	return nbytes;
@@ -188,6 +193,7 @@ static int myfs_releasedir(const char *path, struct fuse_file_info *file_info)
 
 static void* myfs_init(struct fuse_conn_info *connection_info, struct fuse_config *config)
 {
+	(void) connection_info;
 	// connection_info->max_write = 1024 * 128;
     // connection_info->max_read  = 1024 * 128;
 

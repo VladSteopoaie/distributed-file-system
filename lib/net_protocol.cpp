@@ -671,6 +671,11 @@ void StoragePacket::from_buffer(const uint8_t* buffer, size_t len)
 
         data_len = packet_buffer.read_u32();
 
+        message.resize(message_len);
+        // std::cout << "message_len: " << message_len << std::endl;
+        for (size_t i = 0; i < message_len; i ++)
+            message[i] = packet_buffer.read_u8();
+
         path.resize(path_len);
         // std::cout << "path_len: " << path_len << std::endl;
         for (size_t i = 0; i < path_len; i ++)
@@ -680,11 +685,6 @@ void StoragePacket::from_buffer(const uint8_t* buffer, size_t len)
         // std::cout << "data_len: " << data_len << std::endl;
         for (size_t i = 0; i < data_len; i ++)
             data[i] = packet_buffer.read_u8();
-
-        message.resize(message_len);
-        // std::cout << "message_len: " << message_len << std::endl;
-        for (size_t i = 0; i < message_len; i ++)
-            message[i] = packet_buffer.read_u8();
     }
     catch (std::exception& e)
     {
@@ -711,14 +711,15 @@ size_t StoragePacket::to_buffer(std::vector<uint8_t>& final_buffer) const
 
     packet_buffer.write_u32(data_len);
 
+    for (size_t i = 0; i < message_len; i ++)
+        packet_buffer.write_u8(message[i]);
+
     for (size_t i = 0; i < path_len; i ++)
         packet_buffer.write_u8(path[i]);
-
+        
     for (size_t i = 0; i < data_len; i ++)
         packet_buffer.write_u8(data[i]);
     
-    for (size_t i = 0; i < message_len; i ++)
-        packet_buffer.write_u8(message[i]);
 
     std::copy(packet_buffer.get_buffer().begin(), packet_buffer.get_buffer().end(), final_buffer.begin());
     return packet_buffer.get_size();
@@ -745,14 +746,14 @@ size_t StoragePacket::to_buffer_no_resize(std::vector<uint8_t>& final_buffer) co
     
     packet_buffer.write_u32(data_len);
     
+    for (size_t i = 0; i < message_len; i ++)
+        packet_buffer.write_u8(message[i]);
+    
     for (size_t i = 0; i < path_len; i ++)
-    packet_buffer.write_u8(path[i]);
+        packet_buffer.write_u8(path[i]);
     
     for (size_t i = 0; i < data_len; i ++)
-    packet_buffer.write_u8(data[i]);
-    
-    for (size_t i = 0; i < message_len; i ++)
-    packet_buffer.write_u8(message[i]);
+        packet_buffer.write_u8(data[i]);
     
     std::copy(packet_buffer.get_buffer().begin(), packet_buffer.get_buffer().end(), final_buffer.begin());
     return bytes_returned;

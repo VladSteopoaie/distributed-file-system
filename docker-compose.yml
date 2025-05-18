@@ -34,6 +34,14 @@ services:
 
     image: shared_image
 
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - NET_RAW
+    
+    tty: true
+    privileged: true
+
     entrypoint: /project/scripts/setup.sh
 
     networks:
@@ -51,8 +59,17 @@ services:
     container_name: storage_server1
     
     image: shared_image
+
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - NET_RAW
+    
     entrypoint: /project/scripts/setup.sh
     command: storage_s1
+
+    tty: true
+    privileged: true
 
     networks:
       net:
@@ -68,8 +85,17 @@ services:
     container_name: storage_server2
 
     image: shared_image
+ 
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - NET_RAW
+    
     entrypoint: /project/scripts/setup.sh
     command: storage_s2
+ 
+    tty: true
+    privileged: true
 
     networks:
       net:
@@ -83,17 +109,25 @@ services:
   server3:
     container_name: storage_server3
     
-    volumes:
-      - ./storage_server/scripts:/project/scripts
-      - ./lib:/project/lib
-    
     image: shared_image
+
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - NET_RAW
+    tty: true
+    privileged: true
+    
     entrypoint: /project/scripts/setup.sh
     command: storage_s3
   
     networks:
       net:
         ipv4_address: "192.168.1.203"
+
+    volumes:
+      - ./storage_server/scripts:/project/scripts
+      - ./lib:/project/lib
 
 #### NETWORKS ####
 networks:

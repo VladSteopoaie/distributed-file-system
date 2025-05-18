@@ -35,6 +35,7 @@ StorageServer::StorageServer(int thread_count, int stripe_size)
     // }
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &comm_size);
+    // comm_size = 2; // for testing purposes, set comm_size to 2
 
     // initializing connection with mpi masters
     // sending the rank of the master process

@@ -158,9 +158,9 @@ struct StoragePacket {
 
     uint32_t data_len;
 
+    std::vector<uint8_t> message;
     std::vector<uint8_t> path;
     std::vector<uint8_t> data;
-    std::vector<uint8_t> message;
 
     StoragePacket();
     StoragePacket(const uint8_t* buffer, size_t len);
