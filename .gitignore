@@ -5,7 +5,6 @@ file_meta
 dir_meta
 volume
 mpi/openmpi*
-mpi/id_rsa*
 TODO
 metadata.pb*
 *.bin

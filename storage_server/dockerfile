@@ -1,43 +1,20 @@
 FROM ubuntu:latest
 
-RUN mkdir -p /project/mpi
+RUN mkdir -p /project/lib
 RUN mkdir -p /project/scripts
-RUN mkdir -p /project/storage
+RUN mkdir /project/mpi
 
-COPY ./storage_server/setup.sh /project/
-COPY ./storage_server/scripts /project/scripts
+COPY ./lib /project/lib
 COPY ./mpi /project/mpi
+COPY ./storage_server/scripts/ /project/scripts
 
 # installing everything
-RUN apt update && apt install -y \
-    build-essential net-tools iputils-ping git wget vim \
-    openssh-client openssh-server zlib1g-dev
+RUN apt update && apt install -y \ 
+    build-essential net-tools iputils-ping git wget vim \ 
+    meson fuse3 libfuse3-dev memcached libmemcached-tools libmemcached-dev \
+    libfmt-dev libprotobuf-dev protobuf-compiler libspdlog-dev \
+    openssh-client openssh-server zlib1g-dev libpmix2
 
-ARG USERNAME=storage_s1
-ARG USER_UID=1001
-ARG USER_GID=$USER_UID
-
-WORKDIR /etc/sudoers.d
-
-# Create user and group
-RUN groupadd --gid $USER_GID $USERNAME \
-    && useradd --uid $USER_UID --gid $USER_GID -m -s /bin/bash $USERNAME \
-    # Add sudo support (optional)
-    && echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/$USERNAME \
-    && chmod 0440 /etc/sudoers.d/$USERNAME
-
-# Set the working directory to user's home
-WORKDIR /home/$USERNAME
-RUN mkdir -p /home/$USERNAME/.ssh && chmod 700 /home/$USERNAME/.ssh
-RUN cp /project/mpi/ssh_config /home/$USERNAME/.ssh/config
-
-# SSH keys
-RUN cp /project/mpi/id_rsa /home/$USERNAME/.ssh
-RUN cp /project/mpi/id_rsa.pub /home/$USERNAME/.ssh
-RUN chown $USERNAME:$USERNAME /home/$USERNAME/.ssh/id_rsa
-RUN chmod 600 /home/$USERNAME/.ssh/id_rsa
-RUN cat /home/$USERNAME/.ssh/id_rsa.pub >> /home/$USERNAME/.ssh/authorized_keys && \
-    chmod 600 /home/$USERNAME/.ssh/authorized_keys
 RUN mkdir /var/run/sshd
 EXPOSE 22
 
@@ -46,13 +23,84 @@ WORKDIR /project/mpi
 RUN wget https://download.open-mpi.org/release/open-mpi/v5.0/openmpi-5.0.7.tar.gz
 RUN tar xf openmpi-5.0.7.tar.gz
 WORKDIR /project/mpi/openmpi-5.0.7
-
 RUN ./configure 2>&1 | tee config.out
 RUN make all 2>&1 | tee make.out
 RUN make install 2>&1 | tee install.out
-RUN echo "export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH" >> /home/$USERNAME/.bashrc
 
-RUN chown -R $USERNAME:$USERNAME /home/$USERNAME
-RUN chown -R $USERNAME:$USERNAME /project
+# installing ASIO, CLI11 and FUSE
+RUN mkdir /stuff
+WORKDIR /stuff
+RUN git clone https://github.com/chriskohlhoff/asio.git
+RUN cp -r asio/asio/include/asio /usr/local/include/
+RUN cp asio/asio/include/asio.hpp /usr/local/include/
+RUN wget https://github.com/CLIUtils/CLI11/releases/download/v2.5.0/CLI11.hpp
+RUN cp CLI11.hpp /usr/local/include/
+RUN wget https://github.com/libfuse/libfuse/releases/download/fuse-3.17.1/fuse-3.17.1.tar.gz
+RUN tar xf fuse-3.17.1.tar.gz
+RUN mkdir fuse-3.17.1/build
+WORKDIR fuse-3.17.1/build
+RUN meson setup ..
+RUN ninja
+
 WORKDIR /project/scripts
-# CMD ["/usr/sbin/sshd", "-D"]
+
+
+
+# FROM ubuntu:latest
+
+# RUN mkdir -p /project/mpi
+# RUN mkdir -p /project/scripts
+# RUN mkdir -p /project/storage
+
+# COPY ./storage_server/setup.sh /project/
+# COPY ./storage_server/scripts /project/scripts
+# COPY ./mpi /project/mpi
+
+# # installing everything
+# RUN apt update && apt install -y \
+#     build-essential net-tools iputils-ping git wget vim \
+#     openssh-client openssh-server zlib1g-dev
+
+# ARG USERNAME=storage_s1
+# ARG USER_UID=1001
+# ARG USER_GID=$USER_UID
+
+# WORKDIR /etc/sudoers.d
+
+# # Create user and group
+# RUN groupadd --gid $USER_GID $USERNAME \
+#     && useradd --uid $USER_UID --gid $USER_GID -m -s /bin/bash $USERNAME \
+#     # Add sudo support (optional)
+#     && echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/$USERNAME \
+#     && chmod 0440 /etc/sudoers.d/$USERNAME
+
+# # Set the working directory to user's home
+# WORKDIR /home/$USERNAME
+# RUN mkdir -p /home/$USERNAME/.ssh && chmod 700 /home/$USERNAME/.ssh
+# RUN cp /project/mpi/ssh_config /home/$USERNAME/.ssh/config
+
+# # SSH keys
+# RUN cp /project/mpi/id_rsa /home/$USERNAME/.ssh
+# RUN cp /project/mpi/id_rsa.pub /home/$USERNAME/.ssh
+# RUN chown $USERNAME:$USERNAME /home/$USERNAME/.ssh/id_rsa
+# RUN chmod 600 /home/$USERNAME/.ssh/id_rsa
+# RUN cat /home/$USERNAME/.ssh/id_rsa.pub >> /home/$USERNAME/.ssh/authorized_keys && \
+#     chmod 600 /home/$USERNAME/.ssh/authorized_keys
+# RUN mkdir /var/run/sshd
+# EXPOSE 22
+
+# # Download OpenMPI
+# WORKDIR /project/mpi
+# RUN wget https://download.open-mpi.org/release/open-mpi/v5.0/openmpi-5.0.7.tar.gz
+# RUN tar xf openmpi-5.0.7.tar.gz
+# WORKDIR /project/mpi/openmpi-5.0.7
+
+# RUN ./configure 2>&1 | tee config.out
+# RUN make all 2>&1 | tee make.out
+# RUN make install 2>&1 | tee install.out
+# RUN echo "export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH" >> /home/$USERNAME/.bashrc
+
+# RUN chown -R $USERNAME:$USERNAME /home/$USERNAME
+# RUN chown -R $USERNAME:$USERNAME /project
+# WORKDIR /project/scripts
+# # CMD ["/usr/sbin/sshd", "-D"]
