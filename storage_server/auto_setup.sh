@@ -22,4 +22,4 @@ fi
 
 sudo docker build -t storage_server -f dockerfile ..
 read -p "Enter username: " username
-sudo docker run --name storage_server -p 22:22 -it storage_server bash -c "/project/lib/shared_setup.sh $username && /project/scripts/setup.sh"
+sudo docker run --rm --net host -it storage_server bash -c "/project/scripts/setup.sh $username"

@@ -1,4 +1,4 @@
-FROM ubuntu:22.04
+FROM ubuntu:latest
 
 RUN mkdir -p /project/lib
 RUN mkdir -p /project/scripts
