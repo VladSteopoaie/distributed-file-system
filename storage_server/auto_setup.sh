@@ -20,9 +20,10 @@ if [[ " $@ " =~ " docker " ]]; then
 fi
 
 
-sudo docker build -t storage_server -f dockerfile ..
+docker build -t shared_image -f ../dockerfile_shared ..
+docker build -t storage_server -f dockerfile ..
 read -p "Enter username: " username
-sudo docker run --rm --net host -it \
+docker run --rm --net host -it \
     --cap-add SYS_ADMIN \
     --cap-add NET_ADMIN \
     --cap-add NET_RAW \
