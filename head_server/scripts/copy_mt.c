@@ -10,7 +10,7 @@
 #define CHUNK_SIZE (1024 * 1024)  // 1 MB
 #define QUEUE_CAPACITY 16
 #define NUM_WRITERS 4
-#define NUM_READERS 1
+#define NUM_READERS 4
 
 typedef struct {
     off_t offset;

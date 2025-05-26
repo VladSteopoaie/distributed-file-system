@@ -9,3 +9,4 @@ TODO
 metadata.pb*
 *.bin
 .dockerignore
+test_results.txt

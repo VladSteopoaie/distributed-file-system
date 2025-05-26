@@ -1,45 +1,5 @@
-FROM ubuntu:latest
+FROM shared_image:latest
 
-RUN mkdir -p /project/lib
-RUN mkdir -p /project/scripts
-RUN mkdir /project/mpi
+COPY ./scripts/ /project/scripts
 
-COPY ./lib /project/lib
-COPY ./mpi /project/mpi
-
-# installing everything
-RUN apt update && apt install -y \ 
-    build-essential net-tools iputils-ping git wget vim \ 
-    meson fuse3 libfuse3-dev memcached libmemcached-tools libmemcached-dev \
-    libfmt-dev libprotobuf-dev protobuf-compiler libspdlog-dev \
-    openssh-client openssh-server zlib1g-dev libpmix2
-
-RUN mkdir /var/run/sshd
-EXPOSE 22
-
-# Download OpenMPI
-WORKDIR /project/mpi
-RUN wget https://download.open-mpi.org/release/open-mpi/v5.0/openmpi-5.0.7.tar.gz
-RUN tar xf openmpi-5.0.7.tar.gz
-WORKDIR /project/mpi/openmpi-5.0.7
-RUN ./configure 2>&1 | tee config.out
-RUN make all 2>&1 | tee make.out
-RUN make install 2>&1 | tee install.out
-
-# installing ASIO, CLI11 and FUSE
-RUN mkdir /stuff
-WORKDIR /stuff
-RUN git clone https://github.com/chriskohlhoff/asio.git
-RUN cp -r asio/asio/include/asio /usr/local/include/
-RUN cp asio/asio/include/asio.hpp /usr/local/include/
-RUN wget https://github.com/CLIUtils/CLI11/releases/download/v2.5.0/CLI11.hpp
-RUN cp CLI11.hpp /usr/local/include/
-RUN wget https://github.com/libfuse/libfuse/releases/download/fuse-3.17.1/fuse-3.17.1.tar.gz
-RUN tar xf fuse-3.17.1.tar.gz
-RUN mkdir fuse-3.17.1/build
-WORKDIR fuse-3.17.1/build
-RUN meson setup ..
-RUN ninja
-
-WORKDIR /project/scripts
-
+RUN /project/scripts/setup.sh

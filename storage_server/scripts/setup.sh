@@ -5,6 +5,12 @@ set -e
 
 mkdir -p /project/storage
 mkdir -p /project/scripts/bin
+
+cd /project/lib/
+rm -rf metadata.pb* || true
+protoc --cpp_out=. metadata.proto
+mv metadata.pb.cc metadata.pb.cpp
+
 cd /project/scripts
 make -f Makefile_storage || true
 
@@ -12,10 +18,6 @@ chown $1:$1 -R /project/objects
 chown $1:$1 -R /project/storage
 chown $1:$1 -R /project/scripts
 
-cd /project/lib/
-rm -rf metadata.pb* || true
-protoc --cpp_out=. metadata.proto
-mv metadata.pb.cc metadata.pb.cpp
 echo "[+] Done setting up protobuf"
 
 echo "[+] All done!"
