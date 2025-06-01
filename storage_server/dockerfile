@@ -1,6 +1,6 @@
 FROM shared_image:latest
 
-COPY ./scripts/ /project/scripts
-COPY ../lib /project/lib
+COPY ./storage_server/scripts/ /project/scripts
+COPY ./lib /project/lib
 
 # RUN /project/scripts/setup.sh

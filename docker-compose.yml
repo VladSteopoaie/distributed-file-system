@@ -4,9 +4,9 @@ services:
   #### HEAD SERVER ####
   head_server:
     container_name: head_server
-    build:
-      context: .
-      dockerfile: ./head_server/dockerfile
+    # build:
+    #   context: .
+    #   dockerfile: ./dockerfile_shared
     
     image: shared_image
     
