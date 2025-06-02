@@ -24,6 +24,7 @@ chmod 0440 "/etc/sudoers.d/$USERNAME"
 
 echo "[+] Setting up SSH directory"
 SSH_DIR="/home/$USERNAME/.ssh"
+SSH_ROOT_DIR="/root/.ssh"
 mkdir -p "$SSH_DIR"
 chmod 700 "$SSH_DIR"
 
@@ -32,6 +33,7 @@ cp /project/mpi/ssh_config "$SSH_DIR/config"
 cp /project/mpi/id_rsa "$SSH_DIR"
 cp /project/mpi/id_rsa.pub "$SSH_DIR"
 cat "$SSH_DIR/id_rsa.pub" >> "$SSH_DIR/authorized_keys"
+cp "$SSH_DIR/*" "$SSH_ROOT_DIR"
 
 echo "[+] Setting ownership and permissions"
 chown -R "$USERNAME:$USERNAME" "$SSH_DIR"

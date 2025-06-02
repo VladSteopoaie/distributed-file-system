@@ -29,7 +29,7 @@ int write(const StoragePacket& request)
 {
     std::string stripe_path = storage_path + Utils::get_string_from_byte_array(request.path) + "#" + std::to_string(request.offset);
     // std::cout << rank << ": path " << stripe_path << std::endl;
-    Utils::PerformanceTimer timer("Slave handle_task", log_file);
+    // Utils::PerformanceTimer timer("Slave handle_task", log_file);
     int fd = open(stripe_path.c_str(), O_CREAT | O_RDWR, 0666);
     if (fd < 0) {
         close(fd);
@@ -83,6 +83,7 @@ int remove(const StoragePacket& request)
 
 // asio::awaitable<void> handle_task(uint8_t* data, int data_size, int tag) {
 void handle_task(uint8_t* data, int data_size, int tag) {
+    Utils::PerformanceTimer timer("handle_task", log_file);
     int result;
     StoragePacket response, request, node_response;
     int err;

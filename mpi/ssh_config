@@ -2,11 +2,16 @@ Host *
     StrictHostKeyChecking no
 
 Host storage_s1
-  HostName 10.105.137.51
+  HostName 192.168.100.5
   User storage_s1
   IdentityFile ~/.ssh/id_rsa
 
 Host storage_s2
-  HostName 10.105.137.53
+  HostName 192.168.100.10
   User storage_s2
+  IdentityFile ~/.ssh/id_rsa
+
+Host storage_s3
+  HostName 192.168.100.135
+  User storage_s3
   IdentityFile ~/.ssh/id_rsa

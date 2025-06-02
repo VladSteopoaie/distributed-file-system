@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 if [[ " $@ " =~ " docker " ]]; then
     # Add Docker's official GPG key:
     sudo apt-get update
@@ -19,8 +18,12 @@ if [[ " $@ " =~ " docker " ]]; then
     sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 fi
 
+if [[ " $@ " =~ " shared " ]]; then
+    docker rmi -f shared_image
+    docker build -t shared_image -f ../dockerfile_shared ..
+fi
 
-docker build -t shared_image -f ../dockerfile_shared ..
+docker rmi -f storage_server
 docker build -t storage_server -f dockerfile ..
 read -p "Enter username: " username
 docker run --rm --net host -it \

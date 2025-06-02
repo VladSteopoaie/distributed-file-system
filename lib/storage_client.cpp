@@ -61,7 +61,7 @@ asio::awaitable<int> StorageClient::write_async(
         request.data_len = size;
         request.data.assign(buffer, buffer + size);
         {
-            Utils::PerformanceTimer timer("StorageClient::read_async", s_log_file);
+            // Utils::PerformanceTimer timer("StorageClient::read_async", s_log_file);
             co_await send_request_async(request, response);
         }
         // std::cout << response.to_string() << std::endl;

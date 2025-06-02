@@ -45,7 +45,8 @@ namespace Utils
 
     class PerformanceTimer {
     private:
-        std::chrono::time_point<std::chrono::high_resolution_clock> start_time;
+        // std::chrono::time_point<std::chrono::high_resolution_clock> start_time;
+        // std::chrono::time_point<std::chrono::high_resolution_clock> end_time;
         std::string operation_name;
         std::ofstream& log_file;
 
@@ -53,13 +54,16 @@ namespace Utils
         PerformanceTimer(const std::string& name, std::ofstream& file) 
             : operation_name(name), log_file(file) {
             // log_file.open(file, std::ios::app);
-            start_time = std::chrono::high_resolution_clock::now();
+            // start_time = std::chrono::high_resolution_clock::now();
+            log_file << operation_name << " start: " << std::chrono::high_resolution_clock::now() << " microseconds\n";
         }
-
+        
         ~PerformanceTimer() {
-            auto endTime = std::chrono::high_resolution_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - start_time).count();
-            log_file << operation_name << ": " << duration << " microseconds\n";
+            // end_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now()).count();
+            // end_time = std::chrono::high_resolution_clock::now();
+            // auto endTime = std::chrono::high_resolution_clock::now();
+            // auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - start_time).count();
+            log_file << operation_name << " end: " << std::chrono::high_resolution_clock::now() << " microseconds\n";
             log_file.flush();
         }
     };

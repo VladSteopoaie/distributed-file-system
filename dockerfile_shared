@@ -13,7 +13,7 @@ RUN apt update && apt install -y \
     meson fuse3 libfuse3-dev memcached libmemcached-tools libmemcached-dev \
     libfmt-dev libprotobuf-dev protobuf-compiler libspdlog-dev \
     openssh-client openssh-server zlib1g-dev libpmix2 \
-    nfs-common nfs-kernel-server bc 
+    nfs-common nfs-kernel-server bc software-properties-common
 
 RUN mkdir /var/run/sshd
 EXPOSE 22

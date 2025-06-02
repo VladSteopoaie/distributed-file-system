@@ -2,7 +2,8 @@
 
 using namespace StorageAPI;
 
-std::ofstream storage_log_file("/mnt/tmpfs/storage_mngr.log", std::ios::app);
+std::ofstream write_storage_log_file("/mnt/tmpfs/storage_mngr_write.log", std::ios::app);
+std::ofstream read_storage_log_file("/mnt/tmpfs/storage_mngr_read.log", std::ios::app);
 
 void StorageConnectionHandler::handle_request(const StoragePacket& request, StoragePacket& response)
 {
@@ -27,12 +28,15 @@ void StorageConnectionHandler::handle_request(const StoragePacket& request, Stor
                 init_connection(request.id, response);
                 break;
             case OperationCode::Type::READ:
-                read(request, response);
+                {
+                    Utils::PerformanceTimer timer("read", read_storage_log_file);
+                    read(request, response);
+                }
                 // std::cout << response.to_string() << std::endl;
                 break;
             case OperationCode::Type::WRITE:
                 {
-                    Utils::PerformanceTimer timer("StorageConnectionHandler::write", storage_log_file);
+                    Utils::PerformanceTimer timer("write", write_storage_log_file);
                     write(request, response);
                 }
                 break;
