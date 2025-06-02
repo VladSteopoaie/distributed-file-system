@@ -27,7 +27,7 @@ int main(int argc, char** argv)
 
     try {
         ////// LOGGER //////
-        spdlog::set_level(spdlog::level::debug); // Set global log level to debug
+        spdlog::set_level(spdlog::level::err); // Set global log level to debug
         spdlog::set_pattern("(%s:%#) [%^%l%$] %v");
 
         // CacheServer object(8, "--FILE=./memcached.conf", "./storage/");

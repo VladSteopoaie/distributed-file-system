@@ -15,6 +15,12 @@ make -f Makefile_storage_mngr || true
 chown head_s:head_s -R /project/objects
 chown head_s:head_s -R /project/scripts
 
+fallocate -l 1M 1mb.bin
+fallocate -l 10M 10mb.bin
+fallocate -l 100M 100mb.bin
+fallocate -l 50M 50mb.bin
+fallocate -l 200M 200mb.bin
+
 echo "[+] All done!"
 
 # /usr/sbin/sshd -D

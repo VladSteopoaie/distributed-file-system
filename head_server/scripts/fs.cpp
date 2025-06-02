@@ -11,7 +11,9 @@
 
 CacheAPI::CacheClient cache_client;
 StorageAPI::StorageClient storage_client(128 * 1024);
-std::ofstream log_file("/mnt/tmpfs/fs.log", std::ios::app);
+std::ofstream read_log_file("/mnt/tmpfs/fs_read.log", std::ios::app);
+std::ofstream write_log_file("/mnt/tmpfs/fs_write.log", std::ios::app);
+std::ofstream cache_log_file("/mnt/tmpfs/fs_cache.log", std::ios::app);
 
 struct HostInfo {
 	std::string storage_address, storage_port;
@@ -130,9 +132,11 @@ int myfs_release(const char *path, struct fuse_file_info *file_info)
 
 static int myfs_read(const char *path, char *buffer, size_t size, off_t offset, struct fuse_file_info *file_info)
 {
-	std::cout << "Read" << std::endl;
-	std::cout << "Size: " << size << std::endl;
-	std::cout << "Offset: " << offset << std::endl;
+	// std::cout << "Read" << std::endl;
+	// std::cout << "Size: " << size << std::endl;
+	// std::cout << "Offset: " << offset << std::endl;
+		
+	Utils::PerformanceTimer timer("Storage Client Read", read_log_file);
 	size_t r_size = storage_client.read(path, buffer, size, offset);	
 	// std::cout << "Request offset: " << offset << " received: " << r_size << std::endl;
 	return r_size;
@@ -140,20 +144,23 @@ static int myfs_read(const char *path, char *buffer, size_t size, off_t offset, 
 
 static int myfs_write(const char *path, const char *buffer, size_t size, off_t offset, struct fuse_file_info * file_info)
 {
-	std::cout << "Write" << std::endl;
-	std::cout << "Size: " << size << std::endl;
-	std::cout << "Offset: " << offset << std::endl;
+	// std::cout << "Write" << std::endl;
+	// std::cout << "Size: " << size << std::endl;
+	// std::cout << "Offset: " << offset << std::endl;
 
 	// std::vector<uint8_t> vec_buffer(buffer, buffer + size);
 
 	// return storage_client.write_stripes(path, vec_buffer, size, offset);
+	Utils::PerformanceTimer timer("Storage Client Write", write_log_file);
 	int nbytes;
+	// {
+	nbytes = storage_client.write(path, buffer, size, offset);
+	// }
+	// std::cout << nbytes << std::endl;
 	{
-		Utils::PerformanceTimer timer("Storage Client Write:", log_file);
-		nbytes = storage_client.write(path, buffer, size, offset);
+		Utils::PerformanceTimer timer("Cache Client Chsize", cache_log_file);
+		cache_client.chsize(path, offset + (off_t) nbytes);
 	}
-	std::cout << nbytes << std::endl;
-	cache_client.chsize(path, offset + (off_t) nbytes);
 	return nbytes;
 }
 
@@ -266,7 +273,7 @@ int main(int argc, char** argv)
 	int ret;
 	HostInfo host_info;
 	struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
-	spdlog::set_level(spdlog::level::info); // Set global log level
+	spdlog::set_level(spdlog::level::err); // Set global log level
 	spdlog::set_pattern("(%s:%#) [%^%l%$] %v");
 	// Parse command-line arguments
     for (int i = 0; i < argc; ++i) {
