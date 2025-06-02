@@ -26,6 +26,7 @@ echo "[+] Setting up SSH directory"
 SSH_DIR="/home/$USERNAME/.ssh"
 SSH_ROOT_DIR="/root/.ssh"
 mkdir -p "$SSH_DIR"
+mkdir -p "$SSH_ROOT_DIR"
 chmod 700 "$SSH_DIR"
 
 echo "[+] Copying SSH config and keys"
@@ -33,13 +34,13 @@ cp /project/mpi/ssh_config "$SSH_DIR/config"
 cp /project/mpi/id_rsa "$SSH_DIR"
 cp /project/mpi/id_rsa.pub "$SSH_DIR"
 cat "$SSH_DIR/id_rsa.pub" >> "$SSH_DIR/authorized_keys"
-cp "$SSH_DIR/*" "$SSH_ROOT_DIR"
 
 echo "[+] Setting ownership and permissions"
 chown -R "$USERNAME:$USERNAME" "$SSH_DIR"
 chmod 600 "$SSH_DIR/id_rsa"
 chmod 600 "$SSH_DIR/authorized_keys"
 chown -R $USERNAME:$USERNAME /home/$USERNAME
+cp "$SSH_DIR"/* "$SSH_ROOT_DIR"
 # chown -R $USERNAME:$USERNAME /project/scripts
 
 echo "[+] Done setting up user $USERNAME"
