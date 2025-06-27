@@ -14,6 +14,8 @@ namespace CacheAPI {
         uint16_t mem_port;
         pid_t memcached_pid;
 
+        void init();
+
     public:
         CacheServer(const CacheServer&) = delete;
         CacheServer& operator= (const CacheServer&) = delete;

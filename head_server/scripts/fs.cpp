@@ -6,6 +6,8 @@
 #include <fuse.h>
 #include <sys/stat.h>
 #include <unistd.h>
+// #include "../../lib/cache_client.hpp"
+// #include "../../lib/storage_client.hpp"
 #include "../lib/cache_client.hpp"
 #include "../lib/storage_client.hpp"
 
@@ -136,7 +138,7 @@ static int myfs_read(const char *path, char *buffer, size_t size, off_t offset, 
 	// std::cout << "Size: " << size << std::endl;
 	// std::cout << "Offset: " << offset << std::endl;
 		
-	Utils::PerformanceTimer timer("Storage Client Read", read_log_file);
+	// Utils::PerformanceTimer timer("Storage Client Read", read_log_file);
 	size_t r_size = storage_client.read(path, buffer, size, offset);	
 	// std::cout << "Request offset: " << offset << " received: " << r_size << std::endl;
 	return r_size;
@@ -151,14 +153,14 @@ static int myfs_write(const char *path, const char *buffer, size_t size, off_t o
 	// std::vector<uint8_t> vec_buffer(buffer, buffer + size);
 
 	// return storage_client.write_stripes(path, vec_buffer, size, offset);
-	Utils::PerformanceTimer timer("Storage Client Write", write_log_file);
+	// Utils::PerformanceTimer timer("Storage Client Write", write_log_file);
 	int nbytes;
 	// {
 	nbytes = storage_client.write(path, buffer, size, offset);
 	// }
 	// std::cout << nbytes << std::endl;
 	{
-		Utils::PerformanceTimer timer("Cache Client Chsize", cache_log_file);
+		// Utils::PerformanceTimer timer("Cache Client Chsize", cache_log_file);
 		cache_client.chsize(path, offset + (off_t) nbytes);
 	}
 	return nbytes;
@@ -277,12 +279,20 @@ int main(int argc, char** argv)
 	spdlog::set_pattern("(%s:%#) [%^%l%$] %v");
 	// Parse command-line arguments
     for (int i = 0; i < argc; ++i) {
-        if (strcmp(argv[i], "--address") == 0 && i + 1 < argc) {
+        if (strcmp(argv[i], "--cache-address") == 0 && i + 1 < argc) {
             host_info.cache_address = argv[i + 1];
             i++; 
         }
-        else if (strcmp(argv[i], "--port") == 0 && i + 1 < argc) {
+        else if (strcmp(argv[i], "--cache-port") == 0 && i + 1 < argc) {
             host_info.cache_port = argv[i + 1];
+            i++; 
+        }
+        else if (strcmp(argv[i], "--storage-address") == 0 && i + 1 < argc) {
+            host_info.storage_address = argv[i + 1];
+            i++; 
+        }
+        else if (strcmp(argv[i], "--storage-port") == 0 && i + 1 < argc) {
+            host_info.storage_port = argv[i + 1];
             i++; 
         }
 		else {

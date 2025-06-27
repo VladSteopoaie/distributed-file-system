@@ -31,4 +31,6 @@ docker run --rm --net host -it \
     --cap-add NET_ADMIN \
     --cap-add NET_RAW \
     --privileged \
+    --cpuset-cpus 0-7 \
+    --cpus="8.0" \
     storage_server bash -c "/project/scripts/setup.sh $username"

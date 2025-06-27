@@ -3,6 +3,7 @@
 
 #include "net_protocol.hpp"
 #include "generic_connection_handler.hpp"
+#include <mpi.h>
 
 using asio::ip::tcp;
 
@@ -10,10 +11,8 @@ namespace StorageAPI {
     class StorageConnectionHandler : public GenericConnectionHandler<StoragePacket>
     {
     private:
-        // int rank, comm_size;
+        int rank, comm_size;
         size_t stripe_size;
-        // std::vector<asio::ip::tcp::socket> sockets;
-        std::vector<Utils::ConnectionInfo<StoragePacket>> connections;
 
         void handle_request(const StoragePacket& request, StoragePacket& response);
         void init_connection(uint16_t id, StoragePacket& response);
@@ -22,12 +21,7 @@ namespace StorageAPI {
         void remove(const StoragePacket& request, StoragePacket& response);
 
     public:
-        // StorageConnectionHandler(asio::io_context& context, size_t stripe_size, std::vector<Utils::ConnectionInfo<StoragePacket>>&& connections);
-        StorageConnectionHandler(
-            asio::io_context& context, 
-            size_t stripe_size, 
-            std::vector<Utils::ConnectionInfo<StoragePacket>>& connections
-        );
+        StorageConnectionHandler(asio::io_context& context, int rank, int comm_size, size_t stripe_size);
         ~StorageConnectionHandler() override = default;
     };
 }

@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -x
 
 /project/lib/shared_setup.sh $1
 
@@ -22,4 +22,5 @@ echo "[+] Done setting up protobuf"
 
 echo "[+] All done!"
 
-/usr/sbin/sshd -D
+# /usr/sbin/sshd -D
+# sleep infinity

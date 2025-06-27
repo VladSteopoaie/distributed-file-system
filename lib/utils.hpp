@@ -3,7 +3,7 @@
 
 #include <libmemcached/memcached.h>
 
-#include <spdlog.h>
+// #include <spdlog.h>
 
 #include <ctime>
 #include <cstring>
@@ -22,6 +22,16 @@
 #include <vector>
 #include <unistd.h>
 #include "metadata.pb.h"
+
+#ifndef SPDLOG_ACTIVE_LEVEL
+#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
+#endif
+#include <spdlog/spdlog.h>
+
+#define ASIO_STANALONE // non-boost version
+#define ASIO_NO_DEPRECATED // no need for deprecated stuff
+#define ASIO_HAS_STD_COROUTINE // c++20 coroutines needed
+#include <asio.hpp>
 
 namespace Utils 
 {
@@ -67,6 +77,96 @@ namespace Utils
             log_file.flush();
         }
     };
+
+    template<typename Packet>
+    struct ConnectionInfo {
+        std::string address;
+        uint16_t port;
+        ConnectionInfo(const std::string& addr, uint16_t p) : address(addr), port(p) 
+        {
+            // std::cout << "ConnectionInfo()" << std::endl;
+        }
+
+        // ConnectionInfo(const ConnectionInfo& conn) 
+        // {
+        //     // std::cout << 1 << std::endl;
+        //     address = conn.address;
+        //     port = conn.port;
+        // }
+        // ConnectionInfo& operator=(const ConnectionInfo& conn) 
+        // {
+        //     address = conn.address;
+        //     port = conn.port;
+        //     return *this;
+        // }
+        
+        asio::awaitable<size_t> send_receive_data_async(asio::io_context& context, const std::vector<uint8_t>& data, std::vector<uint8_t>& packet_buffer) {
+            asio::ip::tcp::socket socket(context);
+            asio::ip::tcp::resolver resolver(context);
+            asio::ip::tcp::resolver::results_type endpoints =
+                    co_await resolver.async_resolve(address, std::to_string(port), asio::use_awaitable);
+
+            co_await asio::async_connect(socket, endpoints, asio::use_awaitable);
+            co_await asio::async_write(socket, asio::buffer(data), asio::use_awaitable);
+
+            std::vector<uint8_t> buffer(Packet::max_packet_size);
+            packet_buffer.clear();
+            int expected_size = 0;
+            size_t bytes_transferred = 0;
+
+            try {
+                for (;;) {    
+                    if (expected_size != 0)
+                    buffer.resize(expected_size - packet_buffer.size());
+                    bytes_transferred = co_await socket.async_read_some(asio::buffer(buffer), asio::use_awaitable);
+                    packet_buffer.insert(packet_buffer.end(), buffer.begin(), buffer.begin() + bytes_transferred);
+                    
+                    while (true)
+                    {
+                        if (packet_buffer.size() < Packet::header_size)
+                            break;
+
+                        if (!expected_size)
+                            expected_size = Packet::get_packet_size(packet_buffer.data(), packet_buffer.size());
+
+
+                        if (packet_buffer.size() < expected_size)
+                            break;
+                        co_return packet_buffer.size(); 
+                    }
+                }
+            } catch (std::exception& e) {
+                // socket.close();
+                SPDLOG_ERROR("Error during send_receive_data_async: {}", e.what());
+                throw std::runtime_error(std::format("receive_data: {}", e.what()));
+            }
+            co_return -1;
+        }
+
+        static std::vector<ConnectionInfo<Packet>> read_server_file(const std::string& server_file)
+        {
+            std::vector<Utils::ConnectionInfo<Packet>> connections;
+            std::ifstream file(server_file);
+            
+            if (!file.is_open()) {
+                throw std::runtime_error("Could not open server file: " + server_file);
+            }
+
+            std::string line;
+            while (std::getline(file, line)) {
+                if (line.empty() || line[0] == '#') continue; // Skip empty lines and comments
+                size_t pos = line.find(':');
+                if (pos == std::string::npos) continue; // Invalid line format
+                std::string address = line.substr(0, pos);
+                uint16_t port = static_cast<uint16_t>(std::stoi(line.substr(pos + 1)));
+                connections.emplace_back(address, port);
+            }
+
+            file.close();
+            return connections;
+        }
+    };
+
 }
 
 #endif

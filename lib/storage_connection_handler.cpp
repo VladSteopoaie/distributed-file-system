@@ -29,14 +29,14 @@ void StorageConnectionHandler::handle_request(const StoragePacket& request, Stor
                 break;
             case OperationCode::Type::READ:
                 {
-                    Utils::PerformanceTimer timer("read", read_storage_log_file);
+                    // Utils::PerformanceTimer timer("read", read_storage_log_file);
                     read(request, response);
                 }
                 // std::cout << response.to_string() << std::endl;
                 break;
             case OperationCode::Type::WRITE:
                 {
-                    Utils::PerformanceTimer timer("write", write_storage_log_file);
+                    // Utils::PerformanceTimer timer("write", write_storage_log_file);
                     write(request, response);
                 }
                 break;
@@ -70,80 +70,60 @@ void StorageConnectionHandler::read(const StoragePacket& request, StoragePacket&
     int data_len = Utils::get_int_from_byte_array(request.data);
     size_t stripes_num = data_len / stripe_size + (data_len % stripe_size != 0 ? 1 : 0);
     StoragePacket node_request;
-    std::vector<uint8_t> raw_buffer;
-    // size_t raw_buffer_size;
+    std::vector<std::vector<uint8_t>> raw_buffers = std::vector<std::vector<uint8_t>>(stripes_num);
+    std::vector<std::vector<uint8_t>> raw_responses = std::vector<std::vector<uint8_t>>(stripes_num);
+    std::future<size_t> future_responses[stripes_num];
     int node, offset;
-    std::vector<int> responses = std::vector<int>(stripes_num);
-    std::vector<MPI_Request> requests = std::vector<MPI_Request>(stripes_num);
-    
+    int offset_sizes[stripes_num] = {0};
     node_request.opcode = OperationCode::Type::READ;
     node_request.path_len = request.path_len;
     node_request.path = request.path;
+    // std::cout << "Stripes num: " << stripes_num << std::endl;
     for (size_t i = 0; i < stripes_num; i++) {
-        node = ((i + request.offset / stripe_size) % (comm_size - 1)) + 1; // !!! assuming master node has rank 0 !!!
+        node = (i + request.offset / stripe_size) % connections.size();
         offset = request.offset + i * stripe_size;
-
+        
         node_request.id = Utils::generate_id();
         node_request.offset = offset;
-        node_request.to_buffer(raw_buffer);
-        // raw_buffer_size = raw_buffer.size();
-        // std::cout << "data_size: " << raw_buffer_size  << "\n"
-        //     << "node: " << node << "\n"
-        //     << "offset: " << offset << "\n";
-        MPI_Send(raw_buffer.data(), raw_buffer.size(), MPI_UNSIGNED_CHAR, node, offset, MPI_COMM_WORLD);
+        node_request.to_buffer(raw_buffers[i]);
+        // connections[node].send_data_async(raw_buffers[i]);
+        future_responses[i] = asio::co_spawn(
+            context,
+            connections[node].send_receive_data_async(context, raw_buffers[i], raw_responses[i]),
+            asio::use_future
+        );
     }
-
-    int completed = 0, flag;
-    int offset_sizes[stripes_num] = {0};
-    // bool valid_response = true;
-    std::vector<uint8_t> received_bytes;
-    received_bytes.reserve(StoragePacket::header_size + stripe_size);
+    
     StoragePacket node_response;
-    response.data.resize(data_len);
-    response.data_len = data_len;
-    MPI_Status status;
-    while (completed < stripes_num) {
-        for (int i = 0; i < stripes_num; ++i) {
-            node = ((i + request.offset / stripe_size) % (comm_size - 1)) + 1; // !!! assuming master node has rank 0 !!!
-            offset = request.offset + i * stripe_size;
-            flag = 0;
-
-            MPI_Iprobe(node, offset, MPI_COMM_WORLD, &flag, &status);
-            
-            if (flag) {
-                int size;
-                MPI_Get_count(&status, MPI_UNSIGNED_CHAR, &size);
-                if (received_bytes.size() != size)
-                    received_bytes.resize(size);
-
-                MPI_Recv(received_bytes.data(), size, MPI_UNSIGNED_CHAR, node, offset, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                completed++;
-                // std::cout << completed << " < " << stripes_num << std::endl;
-                // if (valid_response)
-                // {
-                node_response.from_buffer(received_bytes.data(), received_bytes.size());
-
-                // if (node_response.rescode == ResultCode::Type::ERRMSG)
-                // {
-                //     // response.rescode = ResultCode::Type::ERRMSG;
-                //     // response.message_len = node_response.message_len;
-                //     // response.message = node_response.message;
-                //     // valid_response = false;
-                //     // std::cout << "Stripe offset: " << offset << " Error!" << std::endl;
-                //     ;
-                // }
-                if (node_response.rescode == ResultCode::Type::SUCCESS)
-                {
-                    // std::cout << node_response.to_string() << std::endl;
-                    offset_sizes[i] = node_response.data_len;
-                    std::copy(node_response.data.begin(), node_response.data.end(), response.data.begin() + offset - request.offset);
-                    // std::cout << "Stripe offset: " << offset << " recovered!" << std::endl;
-                }
-                // } // if (valid_response)
-            } // if (flag)
-        } // for
-    } // while
-
+    for (int i = 0; i < stripes_num; i ++)
+    {
+        future_responses[i].wait();
+        node = (i + request.offset / stripe_size) % connections.size(); // !!! assuming master node has rank 0 !!!
+        offset = request.offset + i * stripe_size;
+        // std::cout << "Node: " << node << std::endl;
+        // std::cout << "Offset: " << offset << std::endl;
+        
+        // std::cout << "Raw response size: " << raw_responses[i].size() << std::endl;
+        node_response.from_buffer(raw_responses[i].data(), raw_responses[i].size());
+        // std::cout << "Node response: " << node_response.to_string() << std::endl;
+        if (node_response.rescode != ResultCode::Type::SUCCESS)
+        {
+            response.rescode = ResultCode::Type::ERRMSG;
+            response.message = node_response.message;
+            response.message_len = response.message.size();
+            return;
+        }
+        if (node_response.rescode == ResultCode::Type::SUCCESS)
+        {
+            // std::cout << node_response.to_string() << std::endl;
+            offset_sizes[i] = node_response.data_len;
+            // std::cout << offset << " " << request.offset << std::endl;
+            response.data.resize(response.data.size() + node_response.data_len);
+            std::copy(node_response.data.begin(), node_response.data.end(), response.data.begin() + offset - request.offset);
+            // std::cout << "Stripe offset: " << offset << " recovered!" << std::endl;
+        }
+    }
+    std::cout << "All stripes recovered!" << std::endl;
     int final_size = 0;
     bool encountered_null = false;
     // std::cout << stripes_num << std::endl;
@@ -178,139 +158,6 @@ void StorageConnectionHandler::read(const StoragePacket& request, StoragePacket&
     response.data.resize(final_size);
 }
 
-// void StorageConnectionHandler::write(const StoragePacket& request, StoragePacket& response)
-// {    
-//     size_t stripes_num = request.data.size() / stripe_size + (request.data.size() % stripe_size != 0 ? 1 : 0);
-//     size_t last_stripe_size = request.data.size() % stripe_size;
-//     if (last_stripe_size == 0 && stripes_num > 0) {
-//         last_stripe_size = stripe_size;
-//     }
-    
-//     // int node;
-//     StoragePacket node_request;
-//     std::vector<uint8_t> raw_buffers[comm_size - 1];
-//     MPI_Request send_requests[comm_size - 1], recv_requests[stripe_size];
-//     int responses[stripes_num];
-//     for (size_t node = 1; node < comm_size; node++)
-//     {
-//         raw_buffers[node - 1].resize(StoragePacket::header_size + stripe_size + 1024); // 1024 is the path max size
-//         MPI_Send_init(raw_buffers[node - 1].data(), raw_buffers[node - 1].size(), MPI_UNSIGNED_CHAR, node, node, MPI_COMM_WORLD, &send_requests[node - 1]);
-//     }
-//     node_request.path_len = request.path_len;
-//     node_request.path = request.path;
-//     for (size_t stripe_idx = 0; stripe_idx < stripes_num; stripe_idx += comm_size - 1) {
-//         for (size_t node = 1; node < comm_size; node++) {
-//             node_request.id = Utils::generate_id();
-//             size_t current_stripe = stripe_idx + (node - 1);
-//             if (current_stripe >= stripes_num)
-//             {
-//                 node_request.opcode = OperationCode::Type::NOP;
-//                 node_request.data_len = 0;
-//                 node_request.to_buffer_no_resize(raw_buffers[node - 1]);
-//             }
-//             else
-//             {
-//                 node_request.opcode = OperationCode::Type::WRITE;
-//                 // size_t final_size = 
-//                 // size_t offset = 
-//                 node_request.data_len = (current_stripe == stripes_num - 1) ? last_stripe_size : stripe_size;;
-//                 node_request.offset = request.offset + current_stripe * stripe_size;;
-//                 node_request.data.assign(request.data.begin() + current_stripe * stripe_size, request.data.begin() + current_stripe * stripe_size + node_request.data_len);
-//                 // std::cout << "data_size: " << final_size  << "\n"
-//                 //     << "node: " << node << "\n"
-//                 //     << "offset: " <<  << "\n";
-//                 // std::cout << "Current stripe: " << current_stripe << std::endl;
-//                 // std::cout << node_request.to_string() << std::endl;
-//                 node_request.to_buffer_no_resize(raw_buffers[node - 1]);
-//                 MPI_Irecv(&responses[current_stripe], 1, MPI_INT, node, node, MPI_COMM_WORLD, &recv_requests[current_stripe]);
-//             }
-//             // raw_buffers[node - 1].resize(StoragePacket::header_size + stripe_size + 1024); // 1024 is the path max size
-//             // std::cout << "node: " << node << ", stripe: " << current_stripe << std::endl;
-//         }
-//         MPI_Startall(comm_size - 1, send_requests);
-//         MPI_Waitall(comm_size - 1, send_requests, MPI_STATUS_IGNORE);
-//         // MPI_Isend(raw_buffers[i].data(), raw_buffers[i].size(), MPI_UNSIGNED_CHAR, node, offset, MPI_COMM_WORLD, &send_requests[i]);
-//         // MPI_Irecv(&responses[i], 1, MPI_INT, node, offset, MPI_COMM_WORLD, &requests[i]);
-//     }
-
-//     // MPI_Waitall(send_requests.size(), send_requests.data(), MPI_STATUSES_IGNORE);
-//     MPI_Waitall(stripes_num, recv_requests, MPI_STATUSES_IGNORE);
-
-//     for (int i = 0; i < stripes_num; i ++)
-//     {
-//         int node = ((i + request.offset / stripe_size) % (comm_size - 1)) + 1; // !!! assuming master node has rank 0 !!!
-//         size_t offset = request.offset + i * stripe_size;
-//         // std::cout << "Node: " << node << ", Offset: " << offset << ", Sent ack: " << responses[i] << std::endl;
-//         if (responses[i] != 0)
-//         {
-//             response.rescode = ResultCode::Type::ERRMSG;
-//             response.message = Utils::get_byte_array_from_int(responses[i]);
-//             response.message_len = response.message.size();
-//             return;
-//         }
-//     }
-
-//     response.rescode = ResultCode::Type::SUCCESS;
-// }
-
-// void StorageConnectionHandler::write(const StoragePacket& request, StoragePacket& response)
-// {    
-//     size_t stripes_num = request.data.size() / stripe_size + (request.data.size() % stripe_size != 0 ? 1 : 0);
-//     size_t last_stripe_size = request.data.size() % stripe_size;
-//     if (last_stripe_size == 0 && stripes_num > 0) {
-//         last_stripe_size = stripe_size;
-//     }
-    
-//     StoragePacket node_request;
-//     std::vector<uint8_t> raw_buffers[stripes_num];
-//     int responses[stripes_num];
-//     // std::vector<MPI_Request> requests = std::vector<MPI_Request>(stripes_num);
-//     // std::vector<MPI_Request> send_requests = std::vector<MPI_Request>(stripes_num);
-//     MPI_Request recv_requests[stripes_num], send_requests[stripes_num];
-//     node_request.opcode = OperationCode::Type::WRITE;
-//     node_request.path_len = request.path_len;
-//     node_request.path = request.path;
-//     for (size_t node = 1; node < comm_size; node++)
-//     {
-//         int first_stripe = node - 1;
-//         for (size_t i = first_stripe; i < stripes_num; i += comm_size - 1) {
-//             size_t final_size = (i == stripes_num - 1) ? last_stripe_size : stripe_size;
-//             // int node = ((i + request.offset / stripe_size) % (comm_size - 1)) + 1; // !!! assuming master node has rank 0 !!!
-//             size_t offset = request.offset + i * stripe_size;
-            
-//             node_request.id = Utils::generate_id();
-//             node_request.data_len = final_size;
-//             node_request.offset = offset;
-//             node_request.data.assign(request.data.begin() + i * stripe_size, request.data.begin() + i * stripe_size + final_size);
-//             node_request.to_buffer(raw_buffers[i]);
-//             // std::cout << "data_size: " << raw_buffer_size  << "\n"
-//             //     << "node: " << node << "\n"
-//             //     << "offset: " << offset << "\n";
-//             MPI_Isend(raw_buffers[i].data(), raw_buffers[i].size(), MPI_UNSIGNED_CHAR, node, offset, MPI_COMM_WORLD, &send_requests[i]);
-//             MPI_Irecv(&responses[i], 1, MPI_INT, node, offset, MPI_COMM_WORLD, &recv_requests[i]);
-//         }
-//     }
-
-//     MPI_Waitall(stripes_num, send_requests, MPI_STATUSES_IGNORE);
-//     MPI_Waitall(stripes_num, recv_requests, MPI_STATUSES_IGNORE);
-
-//     for (int i = 0; i < stripes_num; i ++)
-//     {
-//         int node = ((i + request.offset / stripe_size) % (comm_size - 1)) + 1; // !!! assuming master node has rank 0 !!!
-//         size_t offset = request.offset + i * stripe_size;
-//         // std::cout << "Node: " << node << ", Offset: " << offset << ", Sent ack: " << responses[i] << std::endl;
-//         if (responses[i] != 0)
-//         {
-//             response.rescode = ResultCode::Type::ERRMSG;
-//             response.message = Utils::get_byte_array_from_int(responses[i]);
-//             response.message_len = response.message.size();
-//             return;
-//         }
-//     }
-
-//     response.rescode = ResultCode::Type::SUCCESS;
-// }
-
 void StorageConnectionHandler::write(const StoragePacket& request, StoragePacket& response)
 {    
     size_t stripes_num = request.data.size() / stripe_size + (request.data.size() % stripe_size != 0 ? 1 : 0);
@@ -319,10 +166,10 @@ void StorageConnectionHandler::write(const StoragePacket& request, StoragePacket
         last_stripe_size = stripe_size;
     }
     
-    StoragePacket node_request;
+    StoragePacket node_request, node_response;
     std::vector<std::vector<uint8_t>> raw_buffers = std::vector<std::vector<uint8_t>>(stripes_num);
-    int responses[stripes_num];
-    MPI_Request requests[stripes_num], send_requests[stripes_num];
+    std::vector<std::vector<uint8_t>> raw_responses = std::vector<std::vector<uint8_t>>(stripes_num);
+    std::future<size_t> future_responses[stripes_num];
     node_request.opcode = OperationCode::Type::WRITE;
     node_request.path_len = request.path_len;
     node_request.path = request.path;
@@ -332,7 +179,7 @@ void StorageConnectionHandler::write(const StoragePacket& request, StoragePacket
 
     for (size_t i = 0; i < stripes_num; i++) {
         final_size = (i == stripes_num - 1) ? last_stripe_size : stripe_size;
-        node = ((i + request.offset / stripe_size) % (comm_size - 1)) + 1; // !!! assuming master node has rank 0 !!!
+        node = ((i + request.offset / stripe_size) % connections.size()); // !!! assuming master node has rank 0 !!!
         offset = request.offset + i * stripe_size;
 
         node_request.id = Utils::generate_id();
@@ -340,25 +187,25 @@ void StorageConnectionHandler::write(const StoragePacket& request, StoragePacket
         node_request.offset = offset;
         node_request.data.assign(request.data.begin() + i * stripe_size, request.data.begin() + i * stripe_size + final_size);
         node_request.to_buffer(raw_buffers[i]);
-        // std::cout << "data_size: " << raw_buffer_size  << "\n"
-        //     << "node: " << node << "\n"
-        //     << "offset: " << offset << "\n";
-        MPI_Isend(raw_buffers[i].data(), raw_buffers[i].size(), MPI_UNSIGNED_CHAR, node, offset, MPI_COMM_WORLD, &send_requests[i]);
-        MPI_Irecv(&responses[i], 1, MPI_INT, node, offset, MPI_COMM_WORLD, &requests[i]);    
+        // connections[node].send_data_async(raw_buffers[i]);
+        future_responses[i] = asio::co_spawn(
+            context,
+            connections[node].send_receive_data_async(context, raw_buffers[i], raw_responses[i]),
+            asio::use_future
+        );
     }
 
-    // MPI_Waitall(stripes_num, send_requests, MPI_STATUSES_IGNORE);
-    MPI_Waitall(stripes_num, requests, MPI_STATUSES_IGNORE);
-
-    for (int i =0; i < stripes_num; i ++)
+  
+    for (int i = 0; i < stripes_num; i ++)
     {
-        node = ((i + request.offset / stripe_size) % (comm_size - 1)) + 1; // !!! assuming master node has rank 0 !!!
-        offset = request.offset + i * stripe_size;
-        // std::cout << "Node: " << node << ", Offset: " << offset << ", Sent ack: " << responses[i] << std::endl;
-        if (responses[i] != 0)
+        future_responses[i].wait();
+        node = (i + request.offset / stripe_size) % connections.size(); // !!! assuming master node has rank 0 !!!
+       
+        node_response.from_buffer(raw_responses[i].data(), raw_responses[i].size());
+        if (node_response.rescode != ResultCode::Type::SUCCESS)
         {
             response.rescode = ResultCode::Type::ERRMSG;
-            response.message = Utils::get_byte_array_from_int(responses[i]);
+            response.message = node_response.message;
             response.message_len = response.message.size();
             return;
         }
@@ -371,19 +218,24 @@ void StorageConnectionHandler::remove(const StoragePacket& request, StoragePacke
 {
     std::vector<uint8_t> raw_buffer;
     request.to_buffer(raw_buffer);
-    std::vector<int> responses = std::vector<int>(comm_size - 1);
-    std::vector<MPI_Request> requests = std::vector<MPI_Request>(comm_size - 1);
-    for (int i = 1; i < comm_size; i++)
+    std::vector<std::vector<uint8_t>> responses = std::vector<std::vector<uint8_t>>(connections.size());
+    std::future<size_t> futures[connections.size()];
+    for (int i = 0; i < connections.size(); i ++)
     {
-        MPI_Send(raw_buffer.data(), raw_buffer.size(), MPI_UNSIGNED_CHAR, i, i, MPI_COMM_WORLD);
-        MPI_Irecv(&responses[i - 1], 1, MPI_INT, i, i, MPI_COMM_WORLD, &requests[i - 1]);
+        // connections[i].send_data_async(raw_buffer);
+        futures[i] = asio::co_spawn(
+            context,
+            connections[i].send_receive_data_async(context, raw_buffer, responses[i]),
+            asio::use_future
+        );
     }
 
-    MPI_Waitall(requests.size(), requests.data(), MPI_STATUSES_IGNORE);
-
-    for (int i = 1; i < comm_size; i ++)
+    StoragePacket node_response;
+    for (int i = 0; i < connections.size(); i ++)
     {
-        if (responses[i - 1] != 0)
+        futures[i].wait();
+        node_response.from_buffer(responses[i].data(), responses[i].size());
+        if (node_response.rescode != ResultCode::Type::SUCCESS)
         {
             response.rescode = ResultCode::Type::ERRMSG;
             response.message = Utils::get_byte_array_from_string("Error removing file");
@@ -396,7 +248,13 @@ void StorageConnectionHandler::remove(const StoragePacket& request, StoragePacke
 }
 
 
-StorageConnectionHandler::StorageConnectionHandler(asio::io_context& context, int rank, int comm_size, size_t stripe_size)
+StorageConnectionHandler::StorageConnectionHandler(
+    asio::io_context& context, 
+    size_t stripe_size, 
+    std::vector<Utils::ConnectionInfo<StoragePacket>>& connections
+)
     : GenericConnectionHandler<StoragePacket>::GenericConnectionHandler(context)
-    , rank(rank), comm_size(comm_size), stripe_size(stripe_size) {}
+    , stripe_size(stripe_size)
+    , connections(connections)
+     {}
 

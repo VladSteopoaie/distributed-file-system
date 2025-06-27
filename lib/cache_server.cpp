@@ -4,6 +4,11 @@ using namespace CacheAPI;
 
 template class GenericServer<CacheConnectionHandler>;
 
+void CacheServer::init() {
+    // This method can be used to perform any additional initialization if needed.
+    // Currently, it is not used, but can be extended in the future.
+}
+
 CacheServer::CacheServer(int thread_count, std::string mem_conf_string, std::string file_metadata_dir, std::string dir_metadata_dir)
     : GenericServer<CacheConnectionHandler>::GenericServer(thread_count)
     , mem_conf_string(mem_conf_string)

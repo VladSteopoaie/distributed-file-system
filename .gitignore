@@ -10,3 +10,4 @@ metadata.pb*
 *.bin
 .dockerignore
 tests/
+storage/

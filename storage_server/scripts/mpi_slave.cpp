@@ -83,7 +83,7 @@ int remove(const StoragePacket& request)
 
 // asio::awaitable<void> handle_task(uint8_t* data, int data_size, int tag) {
 void handle_task(uint8_t* data, int data_size, int tag) {
-    Utils::PerformanceTimer timer("handle_task", log_file);
+    // Utils::PerformanceTimer timer("handle_task", log_file);
     int result;
     StoragePacket response, request, node_response;
     int err;

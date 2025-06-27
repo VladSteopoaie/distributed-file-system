@@ -194,3 +194,26 @@ std::string Utils::get_string_from_byte_array(std::vector<uint8_t> byte_array)
     }
     return result;
 }
+
+// std::vector<Utils::ConnectionInfo> Utils::read_server_file(const std::string& server_file)
+// {
+//     std::vector<Utils::ConnectionInfo> connections;
+//     std::ifstream file(server_file);
+    
+//     if (!file.is_open()) {
+//         throw std::runtime_error("Could not open server file: " + server_file);
+//     }
+
+//     std::string line;
+//     while (std::getline(file, line)) {
+//         if (line.empty() || line[0] == '#') continue; // Skip empty lines and comments
+//         size_t pos = line.find(':');
+//         if (pos == std::string::npos) continue; // Invalid line format
+//         std::string address = line.substr(0, pos);
+//         uint16_t port = static_cast<uint16_t>(std::stoi(line.substr(pos + 1)));
+//         connections.emplace_back(address, port);
+//     }
+
+//     file.close();
+//     return connections;
+// }

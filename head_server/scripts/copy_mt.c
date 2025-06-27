@@ -21,9 +21,9 @@ typedef struct {
 typedef struct {
     Chunk *chunks[QUEUE_CAPACITY];
     int front, rear, count;
+    int readers_done;
     pthread_mutex_t mutex;
     pthread_cond_t not_empty, not_full;
-    int readers_done;
 } ChunkQueue;
 
 ChunkQueue queue = {
@@ -79,7 +79,7 @@ void* reader_thread(void *arg) {
         if (offset + CHUNK_SIZE > end)
             chunk_size = end - offset;
 
-        char *buf = malloc(chunk_size);
+        char *buf = (char*) malloc(chunk_size);
         if (!buf) break;
 
         ssize_t n = pread(src_fd, buf, chunk_size, offset);
@@ -93,7 +93,7 @@ void* reader_thread(void *arg) {
             break;
         }
 
-        Chunk *chunk = malloc(sizeof(Chunk));
+        Chunk *chunk = (Chunk*) malloc(sizeof(Chunk));
         chunk->offset = offset;
         chunk->size = n;
         chunk->data = buf;
@@ -161,7 +161,7 @@ int main(int argc, char *argv[]) {
 
     pthread_t readers[NUM_READERS], writers[NUM_WRITERS];
     for (int i = 0; i < NUM_READERS; i++) {
-        int *id = malloc(sizeof(int));
+        int *id = (int*) malloc(sizeof(int));
         *id = i;
         pthread_create(&readers[i], NULL, reader_thread, id);
     }

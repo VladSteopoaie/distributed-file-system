@@ -1,15 +1,15 @@
 #ifndef GENERIC_CLIENT_API_HPP
 #define GENERIC_CLIENT_API_HPP
 
-#define ASIO_STANALONE // non-boost version
-#define ASIO_NO_DEPRECATED // no need for deprecated stuff
-#define ASIO_HAS_STD_COROUTINE // c++20 coroutines needed
-#include <asio.hpp>
+// #define ASIO_STANALONE // non-boost version
+// #define ASIO_NO_DEPRECATED // no need for deprecated stuff
+// #define ASIO_HAS_STD_COROUTINE // c++20 coroutines needed
+// #include <asio.hpp>
 
-#ifndef SPDLOG_ACTIVE_LEVEL
-#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
-#endif
-#include <spdlog/spdlog.h>
+// #ifndef SPDLOG_ACTIVE_LEVEL
+// #define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
+// #endif
+// #include <spdlog/spdlog.h>
 #include "net_protocol.hpp"
 
 using asio::ip::tcp;
@@ -18,7 +18,7 @@ template <typename Packet>
 class GenericClient {
 private:
 
-asio::awaitable<size_t> read_socket(tcp::socket& socket, Packet& response)
+asio::awaitable<size_t> read_socket_async(tcp::socket& socket, Packet& response)
 {
     try {
             std::vector<uint8_t> buffer;
@@ -57,7 +57,7 @@ asio::awaitable<size_t> read_socket(tcp::socket& socket, Packet& response)
             }
             catch (std::exception& e)
             {
-                throw std::runtime_error(std::format("read_socket: {}", e.what()));
+                throw std::runtime_error(std::format("read_socket_async: {}", e.what()));
             }
             
             co_return 0;
@@ -84,7 +84,7 @@ protected:
             request.to_buffer(buffer);
             co_await asio::async_write(socket, asio::buffer(buffer), asio::use_awaitable);
             
-            size_t bytes_received = co_await read_socket(socket, response);
+            size_t bytes_received = co_await read_socket_async(socket, response);
             // socket.async_read_some(asio::buffer(buffer),
             //     [this, self] (std::error_code error, size_t bytes_transferred)
             //     {
