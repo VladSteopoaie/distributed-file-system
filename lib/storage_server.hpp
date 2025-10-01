@@ -7,17 +7,15 @@
 namespace StorageAPI {
     class StorageServer : public GenericServer<StorageConnectionHandler> {
     private:
-        std::vector<Utils::ConnectionInfo<StoragePacket>> connections;
-        int stripe_size; // stripe size for breaking down large files
-        // std::vector<std::unique_ptr<asio::ip::tcp::socket>> sockets;
-        void init();
+        int rank, comm_size;
+        int stripe_size; // stripe size for breaking down large files 
     public:
         StorageServer(const StorageServer&) = delete;
         StorageServer& operator= (const StorageServer&) = delete;
         
-        // StorageServer(std::vector<Utils::ConnectionInfo<StoragePacket>>&& connections);
-        // StorageServer(int thread_count, std::vector<Utils::ConnectionInfo<StoragePacket>>&& connections);
-        StorageServer(int thread_count, int stripe_size, std::vector<Utils::ConnectionInfo<StoragePacket>> connections);
+        StorageServer();
+        StorageServer(int thread_count);
+        StorageServer(int thread_count, int stripe_size);
         ~StorageServer();
 
         void run(uint16_t port);

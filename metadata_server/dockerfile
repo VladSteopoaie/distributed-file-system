@@ -3,4 +3,4 @@ FROM shared_image:latest
 COPY ./metadata_server/scripts/ /project/scripts
 COPY ./lib /project/lib
 
-RUN /project/scripts/setup.sh
+# RUN /project/scripts/setup.sh

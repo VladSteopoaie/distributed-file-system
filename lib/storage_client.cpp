@@ -124,7 +124,7 @@ StorageClient::StorageClient(int thread_count, size_t stripe_size)
     : GenericClient<StoragePacket>(thread_count)
     , stripe_size(stripe_size) 
 {
-    SPDLOG_INFO("StorageClient:\n\t- stripe size: {}\n\t- thread count: {}", stripe_size, thread_count);   
+    // SPDLOG_INFO("StorageClient:\n\t- stripe size: {}\n\t- thread count: {}", stripe_size, thread_count);   
 }
 
 int StorageClient::read(const std::string& path, char* buffer, size_t size, off_t offset)

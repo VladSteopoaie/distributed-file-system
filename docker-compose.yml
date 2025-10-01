@@ -4,11 +4,11 @@ services:
   #### HEAD SERVER ####
   head_server:
     container_name: head_server
-    # build:
-    #   context: .
-    #   dockerfile: ./dockerfile_shared
+    build:
+      context: .
+      dockerfile: ./head_server/dockerfile
     
-    image: shared_image
+    # image: shared_image
     
     cap_add:
       - NET_ADMIN
@@ -31,8 +31,10 @@ services:
   #### METADATA SERVER ####
   metadata_server:
     container_name: metadata_server
-
-    image: shared_image
+    build:
+      context: .
+      dockerfile: ./metadata_server/dockerfile
+    # image: shared_image
 
     cap_add:
       - NET_ADMIN
@@ -58,7 +60,11 @@ services:
   server1:
     container_name: storage_server1
     
-    image: shared_image
+    build:
+      context: .
+      dockerfile: ./storage_server/dockerfile
+
+    # image: shared_image
 
     cap_add:
       - NET_ADMIN
@@ -84,7 +90,11 @@ services:
   server2:
     container_name: storage_server2
 
-    image: shared_image
+    build:
+      context: .
+      dockerfile: ./storage_server/dockerfile
+
+    # image: shared_image
  
     cap_add:
       - NET_ADMIN
@@ -109,7 +119,11 @@ services:
   server3:
     container_name: storage_server3
     
-    image: shared_image
+    build:
+      context: .
+      dockerfile: ./storage_server/dockerfile
+      
+    # image: shared_image
 
     cap_add:
       - NET_ADMIN

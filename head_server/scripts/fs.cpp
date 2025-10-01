@@ -134,9 +134,9 @@ int myfs_release(const char *path, struct fuse_file_info *file_info)
 
 static int myfs_read(const char *path, char *buffer, size_t size, off_t offset, struct fuse_file_info *file_info)
 {
-	// std::cout << "Read" << std::endl;
-	// std::cout << "Size: " << size << std::endl;
-	// std::cout << "Offset: " << offset << std::endl;
+	std::cout << "Read" << std::endl;
+	std::cout << "Size: " << size << std::endl;
+	std::cout << "Offset: " << offset << std::endl;
 		
 	// Utils::PerformanceTimer timer("Storage Client Read", read_log_file);
 	size_t r_size = storage_client.read(path, buffer, size, offset);	
@@ -146,9 +146,9 @@ static int myfs_read(const char *path, char *buffer, size_t size, off_t offset, 
 
 static int myfs_write(const char *path, const char *buffer, size_t size, off_t offset, struct fuse_file_info * file_info)
 {
-	// std::cout << "Write" << std::endl;
-	// std::cout << "Size: " << size << std::endl;
-	// std::cout << "Offset: " << offset << std::endl;
+	std::cout << "Write" << std::endl;
+	std::cout << "Size: " << size << std::endl;
+	std::cout << "Offset: " << offset << std::endl;
 
 	// std::vector<uint8_t> vec_buffer(buffer, buffer + size);
 
@@ -275,7 +275,7 @@ int main(int argc, char** argv)
 	int ret;
 	HostInfo host_info;
 	struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
-	spdlog::set_level(spdlog::level::err); // Set global log level
+	spdlog::set_level(spdlog::level::debug); // Set global log level
 	spdlog::set_pattern("(%s:%#) [%^%l%$] %v");
 	// Parse command-line arguments
     for (int i = 0; i < argc; ++i) {

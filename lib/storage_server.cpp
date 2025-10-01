@@ -3,54 +3,57 @@
 using namespace StorageAPI;
 
 template class GenericServer<StorageConnectionHandler>;
-// StorageServer::StorageServer(std::vector<Utils::ConnectionInfo<StoragePacket>>&& connections)
-//         : StorageServer(1, 4096, std::move(connections)) {}
 
-// StorageServer::StorageServer(int thread_count, std::vector<Utils::ConnectionInfo<StoragePacket>>&& connections)
-//     : StorageServer(thread_count, 4096, std::move(connections)) {}
+StorageServer::StorageServer() : StorageServer(1) {}
 
-StorageServer::StorageServer(int thread_count, int stripe_size, std::vector<Utils::ConnectionInfo<StoragePacket>> connections)
+
+StorageServer::StorageServer(int thread_count)
+    : StorageServer(thread_count, 4096) {} // default stripe size: 4KB
+
+StorageServer::StorageServer(int thread_count, int stripe_size)
     : GenericServer<StorageConnectionHandler>::GenericServer(thread_count)
     , stripe_size(stripe_size)
-    , connections(connections)
-{}
+{
+    // MPI_Datatype dtype;
+    // int err = MPI_Type_match_size(MPI_TYPECLASS_INTEGER, sizeof(stripe_size), &dtype);
 
-void StorageServer::init() {
-    StoragePacket init_packet;
-    std::vector<uint8_t> init_data, response_data[this->connections.size()];
-    std::future<size_t> futures[this->connections.size()];
-    init_packet.opcode = OperationCode::to_byte(OperationCode::Type::INIT);
-    init_packet.message_len = 4;
-    init_packet.message = Utils::get_byte_array_from_int(stripe_size);
+    // if (err == MPI_SUCCESS) {
+    //     if (dtype == MPI_INT)
+    //         std::cout << "master matches MPI_INT\n";
+    //     else if (dtype == MPI_UNSIGNED)
+    //         std::cout << "master matches MPI_UNSIGNED\n";
+    //     else if (dtype == MPI_LONG)
+    //         std::cout << "master matches MPI_LONG\n";
+    //     else if (dtype == MPI_UNSIGNED_LONG)
+    //         std::cout << "master matches MPI_UNSIGNED_LONG\n";
+    //     else if (dtype == MPI_LONG_LONG)
+    //         std::cout << "master matches MPI_LONG_LONG\n";
+    //     else
+    //         std::cout << "master matches some other integer MPI type\n";
+    // } else {
+    //     std::cerr << "No matching MPI integer type found for master\n";
+    // }
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &comm_size);
+    // comm_size = 2; // for testing purposes, set comm_size to 2
 
-    for (int i = 0; i < this->connections.size(); i++)
+    // initializing connection with mpi masters
+    // sending the rank of the master process
+    for (int i = 0; i < comm_size; i ++)
     {
-        init_packet.id = Utils::generate_id();
-        init_packet.to_buffer(init_data);
+        if (i == rank)
+            continue;
         
-        futures[i] = asio::co_spawn(
-            context,
-            this->connections[i].send_receive_data_async(context, init_data, response_data[i]),
-            asio::use_future
-        );
-        SPDLOG_INFO("Initialized connection with {}:{}", this->connections[i].address, this->connections[i].port);
+        // MPI_Send(&rank, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
+        int r = stripe_size;
+        MPI_Send(&r, 1, MPI_INT, i, 1, MPI_COMM_WORLD);
     }
 
-    StoragePacket response_packet;
-    for (int i = 0; i < this->connections.size(); i++)
-    {
-        futures[i].wait();
-        response_packet.from_buffer(response_data[i].data(), response_data[i].size());
-        if (response_packet.rescode != ResultCode::Type::SUCCESS)
-        {
-            SPDLOG_ERROR("Failed to initialize connection with {}:{}. Error: {}", this->connections[i].address, this->connections[i].port, Utils::get_string_from_byte_array(response_packet.message));
-            throw std::runtime_error("Failed to initialize connection with " + this->connections[i].address + ":" + std::to_string(this->connections[i].port));
-        }
-    }
+    SPDLOG_INFO("Server has rank {}", rank);
 }
 
 void StorageServer::run(uint16_t port) {
-    GenericServer<StorageConnectionHandler>::run(port, stripe_size, connections);
+    GenericServer<StorageConnectionHandler>::run(port, rank, comm_size, stripe_size);
 }
 
 StorageServer::~StorageServer()

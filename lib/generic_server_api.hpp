@@ -25,7 +25,6 @@ protected:
         context.stop();
     }
 
-    virtual void init() = 0;
 private:
     int thread_count;
     std::vector<std::thread> thread_pool;
@@ -71,6 +70,7 @@ public:
     {
 
         try {
+            std::cout << 3 << std::endl;
             auto conn_handler = std::make_shared<ConnectionHandler>(context, std::forward<Args>(args)...);
             tcp::endpoint endpoint(tcp::v4(), port);
             acceptor.open(endpoint.protocol());
@@ -87,12 +87,10 @@ public:
 
             for (int i = 0; i < thread_count; i ++)
                 thread_pool.emplace_back([&]() { 
-                    int id = i;
                     context.run();
-                    SPDLOG_WARN("Thread {} finished execution.", id);
+                    SPDLOG_WARN("Thread {} finished execution.", i);
                 });
-            
-            init();
+        
             context.run();
 
             for (auto& t : thread_pool)
